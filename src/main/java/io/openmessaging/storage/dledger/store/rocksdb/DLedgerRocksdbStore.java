@@ -125,6 +125,7 @@ public class DLedgerRocksdbStore extends DLedgerStore {
     public DLedgerEntry get(Long index) {
         RocksIterator it = RDB.newIterator(cfHandle);
         DLedgerEntry dLedgerEntry = new DLedgerEntry();
+        dLedgerEntry.setIndex(index);
         byte[] now = index.toString().getBytes();
         for (it.seek(now); it.isValid(); it.next()) {
             String key = new String(it.key());

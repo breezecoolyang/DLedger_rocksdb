@@ -44,11 +44,14 @@ public class GetCommand extends BaseCommand {
         dLedgerClient.startup();
         GetEntriesResponse response = dLedgerClient.get(index);
         logger.info("Get Result:{}", JSON.toJSONString(response));
+        long start = System.currentTimeMillis();
         if (response.getEntries() != null && response.getEntries().size() > 0) {
             for (DLedgerEntry entry : response.getEntries()) {
                 logger.info("Get Result index:{} {}", entry.getIndex(), new String(entry.getBody()));
             }
         }
+        long end = System.currentTimeMillis();
+        logger.info("time cost:{}", end - start);
         dLedgerClient.shutdown();
     }
 }

@@ -44,10 +44,13 @@ public class AppendCommand extends BaseCommand {
     public void doCommand() {
         DLedgerClient dLedgerClient = new DLedgerClient(group, peers);
         dLedgerClient.startup();
+        long start = System.currentTimeMillis();
         for (int i = 0; i < count; i++) {
             AppendEntryResponse response = dLedgerClient.append(data.getBytes());
             logger.info("Append Result:{}", JSON.toJSONString(response));
         }
+        long end = System.currentTimeMillis();
+        logger.info("time cost:{}", end - start);
         dLedgerClient.shutdown();
     }
 }
