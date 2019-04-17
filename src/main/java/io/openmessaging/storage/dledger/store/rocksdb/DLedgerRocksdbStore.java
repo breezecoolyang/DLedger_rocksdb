@@ -36,7 +36,7 @@ import org.slf4j.LoggerFactory;
 
 public class DLedgerRocksdbStore extends DLedgerStore {
 
-    private static Logger logger = LoggerFactory.getLogger(DLedgerMemoryStore.class);
+    private static Logger logger = LoggerFactory.getLogger(DLedgerRocksdbStore.class);
 
     private long ledgerBeginIndex = -1;
     private long ledgerEndIndex = -1;
@@ -102,7 +102,7 @@ public class DLedgerRocksdbStore extends DLedgerStore {
     }
 
     public byte[] composeData(String key, String value) {
-        String result = key + value;
+        String result = key + "@" + value;
         return result.getBytes();
     }
 
@@ -126,8 +126,10 @@ public class DLedgerRocksdbStore extends DLedgerStore {
         DLedgerEntry dLedgerEntry = new DLedgerEntry();
         byte[] now = index.toString().getBytes();
         for (it.seek(now); it.isValid(); it.next()) {
-            logger.error("key is {}, value is {}", it.key(), it.value());
-            dLedgerEntry.setBody(composeData(new String(it.key()), new String(it.value())));
+            String key = new String(it.key());
+            String value = new String(it.value());
+            logger.error("key is {}, value is {}", key, value);
+            dLedgerEntry.setBody(composeData(key, value));
         }
 
         return dLedgerEntry;
