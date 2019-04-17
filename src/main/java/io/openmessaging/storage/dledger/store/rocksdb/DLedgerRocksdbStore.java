@@ -49,12 +49,13 @@ public class DLedgerRocksdbStore extends DLedgerStore {
     public DLedgerRocksdbStore(DLedgerConfig dLedgerConfig, MemberState memberState) {
         this.dLedgerConfig = dLedgerConfig;
         this.memberState = memberState;
-        ConfigManager.getConfig().getDbConfig().setDbPath(dLedgerConfig.getDataStorePath());
+
     }
 
 
     public void startup() {
         ConfigManager.initConfig();
+        ConfigManager.getConfig().getDbConfig().setDbPath(dLedgerConfig.getDataStorePath());
         RDB.init(ConfigManager.getConfig().getDbConfig().getDbPath());
         cfHandle = CFManager.cfhDefault;
         wb = new WriteBatch();
