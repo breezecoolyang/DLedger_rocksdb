@@ -42,8 +42,8 @@ public class DLedgerRocksdbStore extends DLedgerStore {
     private long ledgerEndIndex = -1;
     private long committedIndex = -1;
     private long ledgerEndTerm;
-    private static ColumnFamilyHandle cfHandle = CFManager.cfhDefault;
-    WriteBatch wb = new WriteBatch();
+    private static ColumnFamilyHandle cfHandle;
+    WriteBatch wb;
     private DLedgerConfig dLedgerConfig;
     private MemberState memberState;
 
@@ -56,6 +56,8 @@ public class DLedgerRocksdbStore extends DLedgerStore {
     public void startup() {
         ConfigManager.initConfig();
         RDB.init(ConfigManager.getConfig().getDbConfig().getDbPath());
+        cfHandle = CFManager.cfhDefault;
+        wb = new WriteBatch();
     }
 
     public void shutdown() {
