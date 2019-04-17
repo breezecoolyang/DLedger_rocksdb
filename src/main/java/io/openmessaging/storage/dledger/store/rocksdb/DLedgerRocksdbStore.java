@@ -21,7 +21,6 @@ import io.openmessaging.storage.dledger.DLedgerConfig;
 import io.openmessaging.storage.dledger.MemberState;
 import io.openmessaging.storage.dledger.entry.DLedgerEntry;
 import io.openmessaging.storage.dledger.protocol.DLedgerResponseCode;
-import io.openmessaging.storage.dledger.store.DLedgerMemoryStore;
 import io.openmessaging.storage.dledger.store.DLedgerStore;
 import io.openmessaging.storage.dledger.store.rocksdb.config.ConfigManager;
 import io.openmessaging.storage.dledger.store.rocksdb.db.CFManager;
@@ -50,6 +49,7 @@ public class DLedgerRocksdbStore extends DLedgerStore {
     public DLedgerRocksdbStore(DLedgerConfig dLedgerConfig, MemberState memberState) {
         this.dLedgerConfig = dLedgerConfig;
         this.memberState = memberState;
+        ConfigManager.getConfig().getDbConfig().setDbPath(dLedgerConfig.getDataStorePath());
     }
 
 
