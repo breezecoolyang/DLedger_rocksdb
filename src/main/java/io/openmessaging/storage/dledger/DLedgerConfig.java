@@ -25,6 +25,7 @@ public class DLedgerConfig {
 
     public static final String MEMORY = "MEMORY";
     public static final String FILE = "FILE";
+    public static final String ROCKSDB = "ROCKSDB";
 
     @Parameter(names = {"--group", "-g"}, description = "Group of this server")
     private String group = "default";
@@ -45,7 +46,7 @@ public class DLedgerConfig {
     @Parameter(names = {"--peer-push-quotas"}, description = "The quotas of the pusher")
     private int peerPushQuota = 20 * 1024 * 1024;
 
-    private String storeType = FILE; //FILE, MEMORY
+    private String storeType = ROCKSDB; //FILE, MEMORY
     private String dataStorePath;
 
     private int maxPendingRequestsNum = 10000;

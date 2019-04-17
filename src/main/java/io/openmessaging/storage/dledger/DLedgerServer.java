@@ -38,6 +38,7 @@ import io.openmessaging.storage.dledger.protocol.VoteResponse;
 import io.openmessaging.storage.dledger.store.DLedgerMemoryStore;
 import io.openmessaging.storage.dledger.store.DLedgerStore;
 import io.openmessaging.storage.dledger.store.file.DLedgerMmapFileStore;
+import io.openmessaging.storage.dledger.store.rocksdb.DLedgerRocksdbStore;
 import io.openmessaging.storage.dledger.utils.PreConditions;
 import java.io.IOException;
 import java.util.Collections;
@@ -85,8 +86,10 @@ public class DLedgerServer implements DLedgerProtocolHander {
     private DLedgerStore createDLedgerStore(String storeType, DLedgerConfig config, MemberState memberState) {
         if (storeType.equals(DLedgerConfig.MEMORY)) {
             return new DLedgerMemoryStore(config, memberState);
-        } else {
+        } else if (storeType.equals(DLedgerConfig.FILE)) {
             return new DLedgerMmapFileStore(config, memberState);
+        } else {
+            return new DLedgerRocksdbStore(config, memberState);
         }
     }
 

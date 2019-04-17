@@ -26,6 +26,7 @@ import io.openmessaging.storage.dledger.protocol.PushEntryResponse;
 import io.openmessaging.storage.dledger.store.DLedgerMemoryStore;
 import io.openmessaging.storage.dledger.store.DLedgerStore;
 import io.openmessaging.storage.dledger.store.file.DLedgerMmapFileStore;
+import io.openmessaging.storage.dledger.store.rocksdb.DLedgerRocksdbStore;
 import io.openmessaging.storage.dledger.utils.DLedgerUtils;
 import io.openmessaging.storage.dledger.utils.Pair;
 import io.openmessaging.storage.dledger.utils.PreConditions;
@@ -374,6 +375,9 @@ public class DLedgerEntryPusher {
                 return;
             }
             if (dLedgerStore instanceof DLedgerMemoryStore) {
+                return;
+            }
+            if (dLedgerStore instanceof DLedgerRocksdbStore) {
                 return;
             }
             DLedgerMmapFileStore mmapFileStore = (DLedgerMmapFileStore) dLedgerStore;
