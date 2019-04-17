@@ -113,7 +113,9 @@ public class DLedgerRocksdbStore extends DLedgerStore {
         String key = splitValue[0];
         String value = splitValue[1];
 
+        logger.error("write value to db key is {}, value is {}", key, value);
         wb.put(cfHandle, key.getBytes(), value.getBytes());
+        RDB.writeAsync(wb);
         wb.clear();
 
     }
