@@ -21,11 +21,18 @@ public class AppendEntryRequest extends RequestOrResponse {
 
     private byte[] body;
 
+    private long timestamp;
+
     public byte[] getBody() {
         return body;
     }
 
     public void setBody(byte[] body) {
         this.body = body;
+    }
+
+    public long getTimeStamp() { return timestamp;}
+    public void setTimestamp(long timestamp) {
+        this.timestamp = timestamp;
     }
 }

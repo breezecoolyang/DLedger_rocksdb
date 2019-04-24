@@ -19,6 +19,8 @@ package io.openmessaging.storage.dledger;
 
 import com.beust.jcommander.Parameter;
 import io.openmessaging.storage.dledger.store.file.DLedgerMmapFileStore;
+import io.openmessaging.storage.dledger.store.rocksdb.DLedgerRocksdbStore;
+
 import java.io.File;
 
 public class DLedgerConfig {
@@ -78,6 +80,7 @@ public class DLedgerConfig {
 
     private int mappedFileSizeForEntryData = 1024 * 1024 * 1024;
     private int mappedFileSizeForEntryIndex = DLedgerMmapFileStore.INDEX_UNIT_SIZE * 5 * 1024 * 1024;
+    private int mappedFileSizeForRocksDBEntryIndex = DLedgerRocksdbStore.INDEX_UNIT_SIZE * 5 * 1024 * 1024;
 
     private boolean enablePushToFollower = true;
 
@@ -111,6 +114,11 @@ public class DLedgerConfig {
     public int getMappedFileSizeForEntryIndex() {
         return mappedFileSizeForEntryIndex;
     }
+
+    public int getMappedFileSizeForRocksDBEntryIndex() {
+        return mappedFileSizeForRocksDBEntryIndex;
+    }
+
 
     public void setMappedFileSizeForEntryIndex(int mappedFileSizeForEntryIndex) {
         this.mappedFileSizeForEntryIndex = mappedFileSizeForEntryIndex;

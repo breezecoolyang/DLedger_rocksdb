@@ -81,6 +81,37 @@ public class DLedgerClient {
         }
     }
 
+    public AppendEntryResponse append(long timestamp, byte[] body) {
+        try {
+            waitOnUpdatingMetadata(1500, false);
+            if (leaderId == null) {
+                AppendEntryResponse appendEntryResponse = new AppendEntryResponse();
+                appendEntryResponse.setCode(DLedgerResponseCode.METADATA_ERROR.getCode());
+                return appendEntryResponse;
+            }
+            AppendEntryRequest appendEntryRequest = new AppendEntryRequest();
+            appendEntryRequest.setGroup(group);
+            appendEntryRequest.setRemoteId(leaderId);
+            appendEntryRequest.setBody(body);
+            appendEntryRequest.setTimestamp(timestamp);
+            AppendEntryResponse response = dLedgerClientRpcService.append(appendEntryRequest).get();
+            if (response.getCode() == DLedgerResponseCode.NOT_LEADER.getCode()) {
+                waitOnUpdatingMetadata(1500, true);
+                if (leaderId != null) {
+                    appendEntryRequest.setRemoteId(leaderId);
+                    response = dLedgerClientRpcService.append(appendEntryRequest).get();
+                }
+            }
+            return response;
+        } catch (Exception e) {
+            needFreshMetadata();
+            logger.error("{}", e);
+            AppendEntryResponse appendEntryResponse = new AppendEntryResponse();
+            appendEntryResponse.setCode(DLedgerResponseCode.INTERNAL_ERROR.getCode());
+            return appendEntryResponse;
+        }
+    }
+
     public GetEntriesResponse get(long index) {
         try {
             waitOnUpdatingMetadata(1500, false);

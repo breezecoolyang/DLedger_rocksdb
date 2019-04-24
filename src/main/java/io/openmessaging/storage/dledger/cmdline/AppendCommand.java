@@ -34,6 +34,9 @@ public class AppendCommand extends BaseCommand {
     @Parameter(names = {"--peers", "-p"}, description = "Peer info of this server")
     private String peers = "n0-localhost:20911";
 
+    @Parameter(names = {"--time", "-t"}, description = "the timestamp to append")
+    private long timestamp = 1536811267;
+
     @Parameter(names = {"--data", "-d"}, description = "the data to append")
     private String data = "Hello";
 
@@ -46,7 +49,7 @@ public class AppendCommand extends BaseCommand {
         dLedgerClient.startup();
         long start = System.currentTimeMillis();
         for (int i = 0; i < count; i++) {
-            AppendEntryResponse response = dLedgerClient.append(data.getBytes());
+            AppendEntryResponse response = dLedgerClient.append(timestamp, data.getBytes());
             logger.info("Append Result:{}", JSON.toJSONString(response));
         }
         long end = System.currentTimeMillis();

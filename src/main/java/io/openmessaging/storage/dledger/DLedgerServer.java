@@ -40,9 +40,12 @@ import io.openmessaging.storage.dledger.store.DLedgerStore;
 import io.openmessaging.storage.dledger.store.file.DLedgerMmapFileStore;
 import io.openmessaging.storage.dledger.store.rocksdb.DLedgerRocksdbStore;
 import io.openmessaging.storage.dledger.utils.PreConditions;
+
 import java.io.IOException;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,7 +69,6 @@ public class DLedgerServer implements DLedgerProtocolHander {
         dLedgerEntryPusher = new DLedgerEntryPusher(dLedgerConfig, memberState, dLedgerStore, dLedgerRpcService);
         dLedgerLeaderElector = new DLedgerLeaderElector(dLedgerConfig, memberState, dLedgerRpcService);
     }
-
 
 
     public void startup() {
@@ -132,9 +134,10 @@ public class DLedgerServer implements DLedgerProtocolHander {
 
     /**
      * Handle the append requests:
-     *  1.append the entry to local store
-     *  2.submit the future to entry pusher and wait the quorum ack
-     *  3.if the pending requests are full, then reject it immediately
+     * 1.append the entry to local store
+     * 2.submit the future to entry pusher and wait the quorum ack
+     * 3.if the pending requests are full, then reject it immediately
+     *
      * @param request
      * @return
      * @throws IOException
@@ -156,6 +159,7 @@ public class DLedgerServer implements DLedgerProtocolHander {
             } else {
                 DLedgerEntry dLedgerEntry = new DLedgerEntry();
                 dLedgerEntry.setBody(request.getBody());
+                dLedgerEntry.setTimestamp(request.getTimeStamp());
                 DLedgerEntry resEntry = dLedgerStore.appendAsLeader(dLedgerEntry);
                 return dLedgerEntryPusher.waitAck(resEntry);
             }
@@ -175,11 +179,15 @@ public class DLedgerServer implements DLedgerProtocolHander {
             PreConditions.check(memberState.getSelfId().equals(request.getRemoteId()), DLedgerResponseCode.UNKNOWN_MEMBER, "%s != %s", request.getRemoteId(), memberState.getSelfId());
             PreConditions.check(memberState.getGroup().equals(request.getGroup()), DLedgerResponseCode.UNKNOWN_GROUP, "%s != %s", request.getGroup(), memberState.getGroup());
             PreConditions.check(memberState.isLeader(), DLedgerResponseCode.NOT_LEADER);
-            DLedgerEntry entry = dLedgerStore.get(request.getBeginIndex());
+//            DLedgerEntry entry = dLedgerStore.get(request.getBeginIndex());
+            List<DLedgerEntry> listEntry = null;
+            if (dLedgerStore instanceof DLedgerRocksdbStore) {
+                listEntry = ((DLedgerRocksdbStore) dLedgerStore).getList(request.getBeginIndex());
+            }
             GetEntriesResponse response = new GetEntriesResponse();
             response.setGroup(memberState.getGroup());
-            if (entry != null) {
-                response.setEntries(Collections.singletonList(entry));
+            if (listEntry != null) {
+                response.setEntries(Collections.unmodifiableList(listEntry));
             }
             return CompletableFuture.completedFuture(response);
         } catch (DLedgerException e) {
@@ -192,7 +200,8 @@ public class DLedgerServer implements DLedgerProtocolHander {
         }
     }
 
-    @Override public CompletableFuture<MetadataResponse> handleMetadata(MetadataRequest request) throws Exception {
+    @Override
+    public CompletableFuture<MetadataResponse> handleMetadata(MetadataRequest request) throws Exception {
         try {
             PreConditions.check(memberState.getSelfId().equals(request.getRemoteId()), DLedgerResponseCode.UNKNOWN_MEMBER, "%s != %s", request.getRemoteId(), memberState.getSelfId());
             PreConditions.check(memberState.getGroup().equals(request.getGroup()), DLedgerResponseCode.UNKNOWN_GROUP, "%s != %s", request.getGroup(), memberState.getGroup());
@@ -217,7 +226,8 @@ public class DLedgerServer implements DLedgerProtocolHander {
         return null;
     }
 
-    @Override public CompletableFuture<PushEntryResponse> handlePush(PushEntryRequest request) throws Exception {
+    @Override
+    public CompletableFuture<PushEntryResponse> handlePush(PushEntryRequest request) throws Exception {
         try {
             PreConditions.check(memberState.getSelfId().equals(request.getRemoteId()), DLedgerResponseCode.UNKNOWN_MEMBER, "%s != %s", request.getRemoteId(), memberState.getSelfId());
             PreConditions.check(memberState.getGroup().equals(request.getGroup()), DLedgerResponseCode.UNKNOWN_GROUP, "%s != %s", request.getGroup(), memberState.getGroup());
