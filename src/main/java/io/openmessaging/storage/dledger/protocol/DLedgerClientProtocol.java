@@ -26,6 +26,8 @@ public interface DLedgerClientProtocol {
 
     CompletableFuture<GetEntriesResponse> get(GetEntriesRequest request) throws Exception;
 
+    CompletableFuture<GetListEntriesResponse> getByTime(GetListEntriesRequest request) throws Exception;
+
     CompletableFuture<AppendEntryResponse> append(AppendEntryRequest request) throws Exception;
 
     CompletableFuture<MetadataResponse> metadata(MetadataRequest request) throws Exception;

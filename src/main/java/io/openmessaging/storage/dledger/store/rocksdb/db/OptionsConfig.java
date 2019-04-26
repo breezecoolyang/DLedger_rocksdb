@@ -35,25 +35,26 @@ import java.util.Arrays;
 import java.util.List;
 
 public class OptionsConfig {
-    static final DBOptions DB_OPTIONS = new DBOptions();
+    private final DBOptions dbOptions = new DBOptions();
 
-    static final ReadOptions READ_OPTIONS = new ReadOptions();
+    private final ReadOptions readOptions = new ReadOptions();
 
-    static final WriteOptions WRITE_OPTIONS_SYNC = new WriteOptions();
+    private final WriteOptions writeOptionsSync = new WriteOptions();
 
-    static final WriteOptions WRITE_OPTIONS_ASYNC = new WriteOptions();
+    private final WriteOptions writeOptionsAsync = new WriteOptions();
 
-    private static final Filter BLOOM_FILTER = new BloomFilter();
+    private final Filter bloomFilter = new BloomFilter();
 
-    private static final BlockBasedTableConfig BLOCK_BASED_TABLE_CONFIG = new BlockBasedTableConfig();
+    private final BlockBasedTableConfig blockBasedTableConfig = new BlockBasedTableConfig();
 
-    static final ColumnFamilyOptions COLUMN_FAMILY_OPTIONS_DEFAULT = new ColumnFamilyOptions();
+    private final ColumnFamilyOptions cloumnFamilyOptionsDefault = new ColumnFamilyOptions();
 
-    private static final List<CompressionType> COMPRESSION_TYPES = new ArrayList<>();
+    private final List<CompressionType> compressionTypes = new ArrayList<>();
 
-    static {
-        DbConfig dbConfig = ConfigManager.getConfig().getDbConfig();
-        DB_OPTIONS
+    public void initialOptions(ConfigManager configManager) {
+
+        DbConfig dbConfig = configManager.getConfig().getDbConfig();
+        dbOptions
                 .setCreateIfMissing(true)
                 .setCreateMissingColumnFamilies(true)
                 .setMaxBackgroundFlushes(dbConfig.getMaxBackgroundFlushes())
@@ -63,49 +64,78 @@ public class OptionsConfig {
                 .setRowCache(new LRUCache(1024 * SizeUnit.MB, 16, true, 5))
                 .setMaxSubcompactions(dbConfig.getMaxSubcompactions());
 
-        DB_OPTIONS.setBaseBackgroundCompactions(dbConfig.getBaseBackgroundCompactions());
+        dbOptions.setBaseBackgroundCompactions(dbConfig.getBaseBackgroundCompactions());
 
-        READ_OPTIONS
+        readOptions
                 .setPrefixSameAsStart(true);
 
-        WRITE_OPTIONS_SYNC
+        writeOptionsSync
                 .setSync(true);
 
-        WRITE_OPTIONS_ASYNC
+        writeOptionsAsync
                 .setSync(false);
 
         // https://github.com/facebook/rocksdb/wiki/RocksDB-Tuning-Guide
         // Bloom filters are always kept in memory for open files,
         // unless BlockBasedTableOptions::cache_index_and_filter_blocks is set to true.
         // Number of open files is controlled by max_open_files option.
-        BLOCK_BASED_TABLE_CONFIG
-                .setFilter(BLOOM_FILTER)
+        blockBasedTableConfig
+                .setFilter(bloomFilter)
                 .setCacheIndexAndFilterBlocks(true)
                 .setPinL0FilterAndIndexBlocksInCache(true);
 
 
-//        COMPRESSION_TYPES.addAll(Arrays.asList(
-//                CompressionType.NO_COMPRESSION, CompressionType.NO_COMPRESSION,
-//                CompressionType.NO_COMPRESSION, CompressionType.NO_COMPRESSION, CompressionType.NO_COMPRESSION,
-//                CompressionType.NO_COMPRESSION, CompressionType.NO_COMPRESSION)
-//        );
-        COMPRESSION_TYPES.addAll(Arrays.asList(
+        compressionTypes.addAll(Arrays.asList(
                 CompressionType.NO_COMPRESSION, CompressionType.NO_COMPRESSION,
-                CompressionType.LZ4_COMPRESSION, CompressionType.LZ4_COMPRESSION, CompressionType.LZ4_COMPRESSION,
-                CompressionType.ZSTD_COMPRESSION, CompressionType.ZSTD_COMPRESSION)
+                CompressionType.NO_COMPRESSION, CompressionType.NO_COMPRESSION, CompressionType.NO_COMPRESSION,
+                CompressionType.NO_COMPRESSION, CompressionType.NO_COMPRESSION)
         );
+//        compressionTypes.addAll(Arrays.asList(
+//                CompressionType.NO_COMPRESSION, CompressionType.NO_COMPRESSION,
+//                CompressionType.LZ4_COMPRESSION, CompressionType.LZ4_COMPRESSION, CompressionType.LZ4_COMPRESSION,
+//                CompressionType.ZSTD_COMPRESSION, CompressionType.ZSTD_COMPRESSION)
+//        );
 
 
-        COLUMN_FAMILY_OPTIONS_DEFAULT
-                .setTableFormatConfig(BLOCK_BASED_TABLE_CONFIG)
+        cloumnFamilyOptionsDefault
+                .setTableFormatConfig(blockBasedTableConfig)
                 .useFixedLengthPrefixExtractor(10)
                 .setWriteBufferSize(dbConfig.getWriteBufferSize() * SizeUnit.MB)
                 .setMaxWriteBufferNumber(dbConfig.getMaxWriteBufferNumber())
                 .setLevel0SlowdownWritesTrigger(dbConfig.getLevel0SlowdownWritesTrigger())
                 .setLevel0StopWritesTrigger(dbConfig.getLevel0StopWritesTrigger())
-                .setCompressionPerLevel(COMPRESSION_TYPES)
+                .setCompressionPerLevel(compressionTypes)
                 .setTargetFileSizeBase(dbConfig.getTargetFileSizeBase() * SizeUnit.MB)
                 .setMaxBytesForLevelBase(dbConfig.getMaxBytesForLevelBase() * SizeUnit.MB)
                 .setOptimizeFiltersForHits(true);
     }
+
+    public ColumnFamilyOptions getColumnFamilyOptions() {
+        return cloumnFamilyOptionsDefault;
+    }
+
+    public DBOptions getDBOptions() {
+        return dbOptions;
+    }
+
+    public WriteOptions getSyncWriteOptions() {
+        return writeOptionsSync;
+    }
+
+    public WriteOptions getAsyncWriteOptions() {
+        return writeOptionsAsync;
+    }
+
+    public ReadOptions getReadOptions() {
+        return readOptions;
+    }
+
+    public void close() {
+        dbOptions.close();
+        writeOptionsSync.close();
+        writeOptionsAsync.close();
+        readOptions.close();
+        cloumnFamilyOptionsDefault.close();
+    }
+
 }

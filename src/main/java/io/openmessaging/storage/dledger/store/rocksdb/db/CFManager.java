@@ -18,6 +18,7 @@
 package io.openmessaging.storage.dledger.store.rocksdb.db;
 
 import com.google.common.base.Charsets;
+import org.rocksdb.AbstractImmutableNativeReference;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 
@@ -25,16 +26,34 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class CFManager {
-    public static ColumnFamilyHandle cfhDefault;
+    public ColumnFamilyHandle cfhDefault;
 
-    static final List<ColumnFamilyDescriptor> CF_DESCRIPTOR = new ArrayList<>();
-    static final List<ColumnFamilyHandle> CF_HANDLES = new ArrayList<>();
+    private final List<ColumnFamilyDescriptor> cfDescriptor = new ArrayList<>();
+    private final List<ColumnFamilyHandle> cfhandles = new ArrayList<>();
 
-    static {
-        CF_DESCRIPTOR.add(new ColumnFamilyDescriptor(CFHandlerNames.DEFAULT.getName().getBytes(Charsets.UTF_8), OptionsConfig.COLUMN_FAMILY_OPTIONS_DEFAULT));
+
+    public CFManager(OptionsConfig optionsConfig) {
+        cfDescriptor.add(new ColumnFamilyDescriptor(CFHandlerNames.DEFAULT.getName().getBytes(Charsets.UTF_8), optionsConfig.getColumnFamilyOptions()));
     }
 
-    static void initCFManger(final List<ColumnFamilyHandle> cfHandles) {
-        cfhDefault = cfHandles.get(CFHandlerNames.DEFAULT.ordinal());
+
+    public void initCFManger() {
+        cfhDefault = cfhandles.get(CFHandlerNames.DEFAULT.ordinal());
+    }
+
+    public List<ColumnFamilyDescriptor> getCfDescriptor() {
+        return cfDescriptor;
+    }
+
+    public List<ColumnFamilyHandle> getCfHandles() {
+        return cfhandles;
+    }
+
+    public ColumnFamilyHandle getDefaultColumnFamilyHandle() {
+        return cfhDefault;
+    }
+
+    public void closeHandles() {
+        cfhandles.forEach(AbstractImmutableNativeReference::close);
     }
 }

@@ -21,7 +21,7 @@ import com.alibaba.fastjson.JSON;
 import com.beust.jcommander.Parameter;
 import io.openmessaging.storage.dledger.client.DLedgerClient;
 import io.openmessaging.storage.dledger.entry.DLedgerEntry;
-import io.openmessaging.storage.dledger.protocol.GetEntriesResponse;
+import io.openmessaging.storage.dledger.protocol.GetListEntriesResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,11 +38,14 @@ public class GetCommand extends BaseCommand {
     @Parameter(names = {"--index", "-i"}, description = "get entry from index")
     private long index = 0;
 
+    @Parameter(names = {"--timestamp", "-t"}, description = "get entry from timestamp")
+    private long timestamp = 1536811267;
+
     @Override
     public void doCommand() {
         DLedgerClient dLedgerClient = new DLedgerClient(group, peers);
         dLedgerClient.startup();
-        GetEntriesResponse response = dLedgerClient.get(index);
+        GetListEntriesResponse response = dLedgerClient.getByTime(timestamp);
         logger.info("Get Result:{}", JSON.toJSONString(response));
         long start = System.currentTimeMillis();
         if (response.getEntries() != null && response.getEntries().size() > 0) {

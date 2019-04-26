@@ -25,6 +25,8 @@ import io.openmessaging.storage.dledger.protocol.DLedgerRequestCode;
 import io.openmessaging.storage.dledger.protocol.DLedgerResponseCode;
 import io.openmessaging.storage.dledger.protocol.GetEntriesRequest;
 import io.openmessaging.storage.dledger.protocol.GetEntriesResponse;
+import io.openmessaging.storage.dledger.protocol.GetListEntriesRequest;
+import io.openmessaging.storage.dledger.protocol.GetListEntriesResponse;
 import io.openmessaging.storage.dledger.protocol.HeartBeatRequest;
 import io.openmessaging.storage.dledger.protocol.HeartBeatResponse;
 import io.openmessaging.storage.dledger.protocol.MetadataRequest;
@@ -95,6 +97,7 @@ public class DLedgerRpcNettyService extends DLedgerRpcService {
         this.remotingServer.registerProcessor(DLedgerRequestCode.METADATA.getCode(), protocolProcessor, null);
         this.remotingServer.registerProcessor(DLedgerRequestCode.APPEND.getCode(), protocolProcessor, null);
         this.remotingServer.registerProcessor(DLedgerRequestCode.GET.getCode(), protocolProcessor, null);
+        this.remotingServer.registerProcessor(DLedgerRequestCode.GETLIST.getCode(), protocolProcessor, null);
         this.remotingServer.registerProcessor(DLedgerRequestCode.PULL.getCode(), protocolProcessor, null);
         this.remotingServer.registerProcessor(DLedgerRequestCode.PUSH.getCode(), protocolProcessor, null);
         this.remotingServer.registerProcessor(DLedgerRequestCode.VOTE.getCode(), protocolProcessor, null);
@@ -144,6 +147,12 @@ public class DLedgerRpcNettyService extends DLedgerRpcService {
 
     @Override public CompletableFuture<GetEntriesResponse> get(GetEntriesRequest request) throws Exception {
         GetEntriesResponse entriesResponse = new GetEntriesResponse();
+        entriesResponse.setCode(DLedgerResponseCode.UNSUPPORTED.getCode());
+        return CompletableFuture.completedFuture(entriesResponse);
+    }
+
+    @Override public CompletableFuture<GetListEntriesResponse> getByTime(GetListEntriesRequest request) throws Exception {
+        GetListEntriesResponse entriesResponse = new GetListEntriesResponse();
         entriesResponse.setCode(DLedgerResponseCode.UNSUPPORTED.getCode());
         return CompletableFuture.completedFuture(entriesResponse);
     }
@@ -260,6 +269,14 @@ public class DLedgerRpcNettyService extends DLedgerRpcService {
                 }, futureExecutor);
                 break;
             }
+            case GETLIST: {
+                GetListEntriesRequest getListEntriesRequest = JSON.parseObject(request.getBody(), GetListEntriesRequest.class);
+                CompletableFuture<GetListEntriesResponse> future = handleGetByTime(getListEntriesRequest);
+                future.whenCompleteAsync((x, y) -> {
+                    writeResponse(x, y, request, ctx);
+                }, futureExecutor);
+                break;
+            }
             case PULL: {
                 PullEntriesRequest pullEntriesRequest = JSON.parseObject(request.getBody(), PullEntriesRequest.class);
                 CompletableFuture<PullEntriesResponse> future = handlePull(pullEntriesRequest);
@@ -317,6 +334,10 @@ public class DLedgerRpcNettyService extends DLedgerRpcService {
 
     @Override public CompletableFuture<GetEntriesResponse> handleGet(GetEntriesRequest request) throws Exception {
         return dLedgerServer.handleGet(request);
+    }
+
+    @Override public CompletableFuture<GetListEntriesResponse> handleGetByTime(GetListEntriesRequest request) throws Exception {
+        return dLedgerServer.handleGetByTime(request);
     }
 
     @Override public CompletableFuture<MetadataResponse> handleMetadata(MetadataRequest request) throws Exception {

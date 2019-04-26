@@ -25,6 +25,8 @@ import io.openmessaging.storage.dledger.protocol.GetEntriesRequest;
 import io.openmessaging.storage.dledger.protocol.GetEntriesResponse;
 import io.openmessaging.storage.dledger.protocol.MetadataRequest;
 import io.openmessaging.storage.dledger.protocol.MetadataResponse;
+import io.openmessaging.storage.dledger.protocol.GetListEntriesRequest;
+import io.openmessaging.storage.dledger.protocol.GetListEntriesResponse;
 import io.openmessaging.storage.dledger.utils.DLedgerUtils;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -142,6 +144,39 @@ public class DLedgerClient {
             return getEntriesResponse;
         }
     }
+
+    public GetListEntriesResponse getByTime(long timestamp) {
+        try {
+            waitOnUpdatingMetadata(1500, false);
+            if (leaderId == null) {
+                GetListEntriesResponse response = new GetListEntriesResponse();
+                response.setCode(DLedgerResponseCode.METADATA_ERROR.getCode());
+                return response;
+            }
+
+            GetListEntriesRequest request = new GetListEntriesRequest();
+            request.setGroup(group);
+            request.setRemoteId(leaderId);
+            request.setTimestamp(timestamp);
+            GetListEntriesResponse response = dLedgerClientRpcService.getByTime(request).get();
+            if (response.getCode() == DLedgerResponseCode.NOT_LEADER.getCode()) {
+                waitOnUpdatingMetadata(1500, true);
+                if (leaderId != null) {
+                    request.setRemoteId(leaderId);
+                    response = dLedgerClientRpcService.getByTime(request).get();
+                }
+            }
+            return response;
+        } catch (Exception t) {
+            needFreshMetadata();
+            logger.error("getByTime error ", t);
+            GetListEntriesResponse getListEntriesResponse = new GetListEntriesResponse();
+            getListEntriesResponse.setCode(DLedgerResponseCode.INTERNAL_ERROR.getCode());
+            return getListEntriesResponse;
+        }
+    }
+
+
 
     public void startup() {
         this.dLedgerClientRpcService.startup();

@@ -24,9 +24,9 @@ public class ConfigManager {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ConfigManager.class);
 
-    private static ChronosConfig cfg = null;
+    private  ChronosConfig cfg = null;
 
-    public static void initConfig() {
+    public  void initConfig() {
         try {
             final long start = System.currentTimeMillis();
             cfg = new ChronosConfig();
@@ -37,7 +37,7 @@ public class ConfigManager {
         }
     }
 
-    public static ChronosConfig getConfig() {
+    public  ChronosConfig getConfig() {
         return cfg;
     }
 }

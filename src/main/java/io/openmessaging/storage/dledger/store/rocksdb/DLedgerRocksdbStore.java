@@ -28,12 +28,10 @@ import io.openmessaging.storage.dledger.store.file.MmapFile;
 import io.openmessaging.storage.dledger.store.file.MmapFileList;
 import io.openmessaging.storage.dledger.store.file.SelectMmapBufferResult;
 import io.openmessaging.storage.dledger.store.rocksdb.config.ConfigManager;
-import io.openmessaging.storage.dledger.store.rocksdb.db.CFManager;
 import io.openmessaging.storage.dledger.store.rocksdb.db.RDB;
 import io.openmessaging.storage.dledger.utils.DLedgerUtils;
 import io.openmessaging.storage.dledger.utils.IOUtils;
 import io.openmessaging.storage.dledger.utils.PreConditions;
-import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksIterator;
 import org.rocksdb.WriteBatch;
 import org.slf4j.Logger;
@@ -56,6 +54,7 @@ public class DLedgerRocksdbStore extends DLedgerStore {
     public static final String COMMITTED_INDEX_KEY = "committedIndex";
     public static final int MAGIC_1 = 1;
     public static final int CURRENT_MAGIC = MAGIC_1;
+    public  RDB rdb;
     public static final int INDEX_UNIT_SIZE = 28; //magic + index + key_prefix(timestamp + index)
     private static final String KEY_SEPARATOR = "_";
 
@@ -63,7 +62,7 @@ public class DLedgerRocksdbStore extends DLedgerStore {
     private long ledgerEndIndex = -1;
     private long committedIndex = -1;
     private long ledgerEndTerm;
-    private static ColumnFamilyHandle cfHandle;
+    private ConfigManager configManager;
     private WriteBatch wb;
     private DLedgerConfig dLedgerConfig;
     private MemberState memberState;
@@ -84,14 +83,15 @@ public class DLedgerRocksdbStore extends DLedgerStore {
         localIndexBuffer = ThreadLocal.withInitial(() -> ByteBuffer.allocate(INDEX_UNIT_SIZE * 2));
         flushDataService = new DLedgerRocksdbStore.FlushDataService("DLedgerFlushDataService", logger);
         cleanSpaceService = new DLedgerRocksdbStore.CleanSpaceService("DLedgerCleanSpaceService", logger);
+        configManager = new ConfigManager();
+        configManager.initConfig();
+        configManager.getConfig().getDbConfig().setDbPath(dLedgerConfig.getDataStorePath());
+        rdb = new RDB(configManager);
 
     }
 
     public void rocksdbInitial() {
-        ConfigManager.initConfig();
-        ConfigManager.getConfig().getDbConfig().setDbPath(dLedgerConfig.getDataStorePath());
-        RDB.init(ConfigManager.getConfig().getDbConfig().getDbPath());
-        cfHandle = CFManager.cfhDefault;
+        rdb.init();
         wb = new WriteBatch();
     }
 
@@ -114,7 +114,7 @@ public class DLedgerRocksdbStore extends DLedgerStore {
     }
 
     public void shutdown() {
-        RDB.close();
+        rdb.close();
         this.indexFileList.flush(0);
         persistCheckPoint();
         cleanSpaceService.shutdown();
@@ -127,6 +127,10 @@ public class DLedgerRocksdbStore extends DLedgerStore {
         }
         PreConditions.check(indexFileList.checkSelf(), DLedgerResponseCode.DISK_ERROR, "check index file order failed before recovery");
         final List<MmapFile> mappedFiles = this.indexFileList.getMappedFiles();
+        if (mappedFiles.isEmpty()) {
+            return;
+        }
+
         MmapFile lastMappedFile = indexFileList.getLastMappedFile();
         int index = mappedFiles.size() - 3;
         if (index < 0) {
@@ -148,9 +152,10 @@ public class DLedgerRocksdbStore extends DLedgerStore {
                 long indexTimestamp = byteBuffer.getLong();
                 long indexEntryTerm = byteBuffer.getLong();
                 PreConditions.check(CURRENT_MAGIC == magic, DLedgerResponseCode.DISK_ERROR, "magic %d != %d", magic, CURRENT_MAGIC);
-                PreConditions.check(indexFromIndex > lastEntryIndex, DLedgerResponseCode.DISK_ERROR, "indexFromIndex %d != %d", indexFromIndex, lastEntryIndex);
+                PreConditions.check(indexFromIndex == lastEntryIndex + 1, DLedgerResponseCode.DISK_ERROR, "indexFromIndex %d != %d", indexFromIndex, lastEntryIndex);
                 PreConditions.check(indexTimestamp >= lastTimestamp, DLedgerResponseCode.DISK_ERROR, "indexTimestamp %d != %d", indexFromIndex, lastTimestamp);
-                PreConditions.check(indexEntryTerm > lastEntryTerm, DLedgerResponseCode.DISK_ERROR, "indexEntryTerm %d != %d", indexFromIndex, lastEntryTerm);
+                PreConditions.check(indexEntryTerm >= lastEntryTerm, DLedgerResponseCode.DISK_ERROR, "indexEntryTerm %d != %d", indexFromIndex, lastEntryTerm);
+                PreConditions.check(indexProcessOffset == indexFromIndex * INDEX_UNIT_SIZE, DLedgerResponseCode.DISK_ERROR, "pos %d != %d", indexProcessOffset, indexFromIndex * INDEX_UNIT_SIZE);
                 lastEntryIndex = indexFromIndex;
                 lastEntryTerm = indexEntryTerm;
                 indexProcessOffset += INDEX_UNIT_SIZE;
@@ -241,10 +246,11 @@ public class DLedgerRocksdbStore extends DLedgerStore {
 
             DLedgerRocksdbEntryCoder.encodeIndex(CURRENT_MAGIC, nextIndex, entry.getTimestamp(), memberState.currTerm(), indexBuffer);
             long indexPos = indexFileList.append(indexBuffer.array(), 0, indexBuffer.remaining(), false);
-            PreConditions.check(indexPos == entry.getIndex() * INDEX_UNIT_SIZE, DLedgerResponseCode.DISK_ERROR, null);
+            PreConditions.check(indexPos == entry.getIndex() * INDEX_UNIT_SIZE, DLedgerResponseCode.DISK_ERROR, "appendAsLeader indexPos %d != entryPos %d", indexPos, entry.getIndex() * INDEX_UNIT_SIZE);
             if (logger.isDebugEnabled()) {
                 logger.debug("[{}] Append as Leader {} {}", memberState.getSelfId(), entry.getIndex(), entry.getBody().length);
             }
+            ledgerEndIndex++;
             if (ledgerBeginIndex == -1) {
                 ledgerBeginIndex = ledgerEndIndex;
             }
@@ -258,9 +264,12 @@ public class DLedgerRocksdbStore extends DLedgerStore {
 
         String key = String.valueOf(entry.getTimestamp()) + "_" + String.valueOf(entry.getIndex());
 
-        logger.error("write value to db key is {}, value is {}", key, new String(entry.getBody()));
-        wb.put(cfHandle, key.getBytes(), entry.getBody());
-        RDB.writeAsync(wb);
+        if (logger.isDebugEnabled()) {
+            logger.debug("write value to db key is {}, value is {}", key, new String(entry.getBody()));
+        }
+
+        wb.put(rdb.getDefaultCfHandle(), key.getBytes(), entry.getBody());
+        rdb.writeAsync(wb);
         wb.clear();
 
     }
@@ -270,24 +279,27 @@ public class DLedgerRocksdbStore extends DLedgerStore {
         return splitArr[1].equals(index.toString());
     }
 
+    private String makeKey(Long index, Long timestamp) {
+        return timestamp.toString() + KEY_SEPARATOR + index.toString();
+    }
 
     @Override
     public DLedgerEntry get(Long index) {
-        RocksIterator it = RDB.newIterator(cfHandle);
-        DLedgerEntry dLedgerEntry = null;
-
-        byte[] now = index.toString().getBytes();
-        for (it.seek(now); it.isValid(); it.next()) {
-            String key = new String(it.key());
-            if (isKeyHaveIndex(key, index)) {
-                dLedgerEntry = new DLedgerEntry();
-                dLedgerEntry.setIndex(index);
-                String value = new String(it.value());
-                logger.error("key is {}, value is {}", key, value);
-                dLedgerEntry.setBody(it.value());
-                break;
-            }
+        PreConditions.check(index >= 0, DLedgerResponseCode.INDEX_OUT_OF_RANGE, "%d should gt 0", index);
+        PreConditions.check(index <= ledgerEndIndex && index >= ledgerBeginIndex, DLedgerResponseCode.INDEX_OUT_OF_RANGE, "%d should between %d-%d", index, ledgerBeginIndex, ledgerEndIndex);
+        Long timestamp = getTimestampFromFile(index);
+        String key = makeKey(index, timestamp);
+        if (logger.isDebugEnabled()) {
+            logger.error("[{}] get key is {}, index is {}", memberState.getSelfId(), key, index);
         }
+        DLedgerEntry dLedgerEntry = new DLedgerEntry();
+        dLedgerEntry.setIndex(index);
+        dLedgerEntry.setTimestamp(timestamp);
+        dLedgerEntry.setBody(rdb.getDefault(key.getBytes()));
+        if (logger.isDebugEnabled()) {
+            logger.debug("[{}] get from leader index:{} body:{}", memberState.getSelfId(), dLedgerEntry.getIndex(), new String(dLedgerEntry.getBody()));
+        }
+
         return dLedgerEntry;
     }
 
@@ -298,14 +310,15 @@ public class DLedgerRocksdbStore extends DLedgerStore {
             indexSbr = indexFileList.getData(indexOffset, INDEX_UNIT_SIZE);
             PreConditions.check(indexSbr != null && indexSbr.getByteBuffer() != null, DLedgerResponseCode.DISK_ERROR, "Get null index for %d", index);
             indexSbr.getByteBuffer().getInt(); //magic
-            return indexSbr.getByteBuffer().getLong(); //index
+            indexSbr.getByteBuffer().getLong(); //index
+            return indexSbr.getByteBuffer().getLong(); //timestamp
         } finally {
             SelectMmapBufferResult.release(indexSbr);
         }
     }
 
     public List<DLedgerEntry> getList(Long timestamp) {
-        RocksIterator it = RDB.newIterator(cfHandle);
+        RocksIterator it = rdb.newIteratorDefault();
         List<DLedgerEntry> dLedgerEntries = new ArrayList<>(2000);
         byte[] now = timestamp.toString().getBytes();
         for (it.seek(now); it.isValid(); it.next()) {
@@ -314,24 +327,20 @@ public class DLedgerRocksdbStore extends DLedgerStore {
             String[] splitArr = key.split(KEY_SEPARATOR);
             dLedgerEntry.setTimestamp(timestamp);
             dLedgerEntry.setIndex(Long.parseLong(splitArr[1]));
+            dLedgerEntry.setBody(it.value());
             dLedgerEntries.add(dLedgerEntry);
         }
 
+        if (logger.isDebugEnabled()) {
+            logger.debug("[{}] getList size is  [{}] first element is [{}]", memberState.getSelfId(), dLedgerEntries.size(), dLedgerEntries.get(0));
+        }
         return dLedgerEntries;
     }
 
 
     private void deleteDataInRocksdb(long index, Long timestamp) {
-        RocksIterator it = RDB.newIterator(cfHandle);
-        byte[] now = timestamp.toString().getBytes();
-        for (it.seek(now); it.isValid(); it.next()) {
-            String key = new String(it.key());
-            String[] splitArr = key.split(KEY_SEPARATOR);
-            if (Long.parseLong(splitArr[1]) == index) {
-                RDB.delete(cfHandle, key.getBytes());
-                break;
-            }
-        }
+        String key = makeKey(index, timestamp);
+        rdb.deleteDefault(key.getBytes());
     }
 
     @Override

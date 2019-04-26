@@ -25,6 +25,8 @@ import io.openmessaging.storage.dledger.protocol.DLedgerProtocolHander;
 import io.openmessaging.storage.dledger.protocol.DLedgerResponseCode;
 import io.openmessaging.storage.dledger.protocol.GetEntriesRequest;
 import io.openmessaging.storage.dledger.protocol.GetEntriesResponse;
+import io.openmessaging.storage.dledger.protocol.GetListEntriesRequest;
+import io.openmessaging.storage.dledger.protocol.GetListEntriesResponse;
 import io.openmessaging.storage.dledger.protocol.HeartBeatRequest;
 import io.openmessaging.storage.dledger.protocol.HeartBeatResponse;
 import io.openmessaging.storage.dledger.protocol.MetadataRequest;
@@ -179,20 +181,51 @@ public class DLedgerServer implements DLedgerProtocolHander {
             PreConditions.check(memberState.getSelfId().equals(request.getRemoteId()), DLedgerResponseCode.UNKNOWN_MEMBER, "%s != %s", request.getRemoteId(), memberState.getSelfId());
             PreConditions.check(memberState.getGroup().equals(request.getGroup()), DLedgerResponseCode.UNKNOWN_GROUP, "%s != %s", request.getGroup(), memberState.getGroup());
             PreConditions.check(memberState.isLeader(), DLedgerResponseCode.NOT_LEADER);
-//            DLedgerEntry entry = dLedgerStore.get(request.getBeginIndex());
-            List<DLedgerEntry> listEntry = null;
-            if (dLedgerStore instanceof DLedgerRocksdbStore) {
-                listEntry = ((DLedgerRocksdbStore) dLedgerStore).getList(request.getBeginIndex());
-            }
+            DLedgerEntry entry = dLedgerStore.get(request.getBeginIndex());
             GetEntriesResponse response = new GetEntriesResponse();
             response.setGroup(memberState.getGroup());
-            if (listEntry != null) {
-                response.setEntries(Collections.unmodifiableList(listEntry));
+            if (entry != null) {
+                response.setEntries(Collections.singletonList(entry));
             }
             return CompletableFuture.completedFuture(response);
         } catch (DLedgerException e) {
             logger.error("[{}][HandleGet] failed", memberState.getSelfId(), e);
             GetEntriesResponse response = new GetEntriesResponse();
+            response.copyBaseInfo(request);
+            response.setLeaderId(memberState.getLeaderId());
+            response.setCode(e.getCode().getCode());
+            return CompletableFuture.completedFuture(response);
+        }
+    }
+
+    @Override
+    public CompletableFuture<GetListEntriesResponse> handleGetByTime(GetListEntriesRequest request) throws IOException {
+        try {
+            PreConditions.check(memberState.getSelfId().equals(request.getRemoteId()), DLedgerResponseCode.UNKNOWN_MEMBER, "%s != %s", request.getRemoteId(), memberState.getSelfId());
+            PreConditions.check(memberState.getGroup().equals(request.getGroup()), DLedgerResponseCode.UNKNOWN_GROUP, "%s != %s", request.getGroup(), memberState.getGroup());
+            PreConditions.check(memberState.isLeader(), DLedgerResponseCode.NOT_LEADER);
+            GetListEntriesResponse response = new GetListEntriesResponse();
+            if (dLedgerStore instanceof DLedgerRocksdbStore) {
+                List<DLedgerEntry> listEntry = ((DLedgerRocksdbStore) dLedgerStore).getList(request.getTimestamp());
+                response.setGroup(memberState.getGroup());
+                if (listEntry != null) {
+                    response.setEntries(listEntry);
+                    if (logger.isDebugEnabled()) {
+                        logger.error("listEntry size is {}", listEntry.size());
+                        for (DLedgerEntry entry : listEntry) {
+                            logger.error("element is {}", entry);
+                        }
+                    }
+                }
+
+            } else {
+                throw new IOException("The dLedgerStore is not DLedgerRocksdbStore");
+            }
+
+            return CompletableFuture.completedFuture(response);
+        } catch (DLedgerException e) {
+            logger.error("[{}][HandleGetByTime] failed", memberState.getSelfId(), e);
+            GetListEntriesResponse response = new GetListEntriesResponse();
             response.copyBaseInfo(request);
             response.setLeaderId(memberState.getLeaderId());
             response.setCode(e.getCode().getCode());

@@ -25,7 +25,10 @@ import io.openmessaging.storage.dledger.protocol.GetEntriesRequest;
 import io.openmessaging.storage.dledger.protocol.GetEntriesResponse;
 import io.openmessaging.storage.dledger.protocol.MetadataRequest;
 import io.openmessaging.storage.dledger.protocol.MetadataResponse;
+import io.openmessaging.storage.dledger.protocol.GetListEntriesRequest;
+import io.openmessaging.storage.dledger.protocol.GetListEntriesResponse;
 import java.util.concurrent.CompletableFuture;
+
 import org.apache.rocketmq.remoting.netty.NettyClientConfig;
 import org.apache.rocketmq.remoting.netty.NettyRemotingClient;
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
@@ -47,7 +50,8 @@ public class DLedgerClientRpcNettyService extends DLedgerClientRpcService {
         return CompletableFuture.completedFuture(response);
     }
 
-    @Override public CompletableFuture<MetadataResponse> metadata(MetadataRequest request) throws Exception {
+    @Override
+    public CompletableFuture<MetadataResponse> metadata(MetadataRequest request) throws Exception {
         RemotingCommand wrapperRequest = RemotingCommand.createRequestCommand(DLedgerRequestCode.METADATA.getCode(), null);
         wrapperRequest.setBody(JSON.toJSONBytes(request));
         RemotingCommand wrapperResponse = this.remotingClient.invokeSync(getPeerAddr(request.getRemoteId()), wrapperRequest, 3000);
@@ -61,6 +65,15 @@ public class DLedgerClientRpcNettyService extends DLedgerClientRpcService {
         wrapperRequest.setBody(JSON.toJSONBytes(request));
         RemotingCommand wrapperResponse = this.remotingClient.invokeSync(getPeerAddr(request.getRemoteId()), wrapperRequest, 3000);
         GetEntriesResponse response = JSON.parseObject(wrapperResponse.getBody(), GetEntriesResponse.class);
+        return CompletableFuture.completedFuture(response);
+    }
+
+    @Override
+    public CompletableFuture<GetListEntriesResponse> getByTime(GetListEntriesRequest request) throws Exception {
+        RemotingCommand wrapperRequest = RemotingCommand.createRequestCommand(DLedgerRequestCode.GETLIST.getCode(), null);
+        wrapperRequest.setBody(JSON.toJSONBytes(request));
+        RemotingCommand wrapperResponse = this.remotingClient.invokeSync(getPeerAddr(request.getRemoteId()), wrapperRequest, 3000);
+        GetListEntriesResponse response = JSON.parseObject(wrapperResponse.getBody(), GetListEntriesResponse.class);
         return CompletableFuture.completedFuture(response);
     }
 

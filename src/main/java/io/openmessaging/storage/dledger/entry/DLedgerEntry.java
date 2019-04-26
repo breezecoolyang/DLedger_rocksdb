@@ -178,4 +178,8 @@ public class DLedgerEntry {
     public void setChannel(int channel) {
         this.channel = channel;
     }
+
+    public String toString() {
+        return " index: " + index + " timestamp: " + timestamp + " term: " + term;
+    }
 }

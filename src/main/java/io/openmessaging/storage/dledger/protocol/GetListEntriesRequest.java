@@ -17,24 +17,12 @@
 
 package io.openmessaging.storage.dledger.protocol;
 
-import java.util.List;
 
-public class GetEntriesRequest extends RequestOrResponse {
-    private Long beginIndex;
+public class GetListEntriesRequest extends RequestOrResponse {
 
     private int maxSize;
 
-    private List<Long> indexList;
-
     private Long timestamp;
-
-    public Long getBeginIndex() {
-        return beginIndex;
-    }
-
-    public void setBeginIndex(Long beginIndex) {
-        this.beginIndex = beginIndex;
-    }
 
     public int getMaxSize() {
         return maxSize;
@@ -42,14 +30,6 @@ public class GetEntriesRequest extends RequestOrResponse {
 
     public void setMaxSize(int maxSize) {
         this.maxSize = maxSize;
-    }
-
-    public List<Long> getIndexList() {
-        return indexList;
-    }
-
-    public void setIndexList(List<Long> indexList) {
-        this.indexList = indexList;
     }
 
     public Long getTimestamp() {

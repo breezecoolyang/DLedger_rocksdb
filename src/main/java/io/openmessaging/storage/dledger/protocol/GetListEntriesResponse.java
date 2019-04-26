@@ -17,46 +17,19 @@
 
 package io.openmessaging.storage.dledger.protocol;
 
+import io.openmessaging.storage.dledger.entry.DLedgerEntry;
+
+import java.util.ArrayList;
 import java.util.List;
 
-public class GetEntriesRequest extends RequestOrResponse {
-    private Long beginIndex;
+public class GetListEntriesResponse extends RequestOrResponse {
+    private List<DLedgerEntry> entries = new ArrayList<>();
 
-    private int maxSize;
-
-    private List<Long> indexList;
-
-    private Long timestamp;
-
-    public Long getBeginIndex() {
-        return beginIndex;
+    public List<DLedgerEntry> getEntries() {
+        return entries;
     }
 
-    public void setBeginIndex(Long beginIndex) {
-        this.beginIndex = beginIndex;
-    }
-
-    public int getMaxSize() {
-        return maxSize;
-    }
-
-    public void setMaxSize(int maxSize) {
-        this.maxSize = maxSize;
-    }
-
-    public List<Long> getIndexList() {
-        return indexList;
-    }
-
-    public void setIndexList(List<Long> indexList) {
-        this.indexList = indexList;
-    }
-
-    public Long getTimestamp() {
-        return timestamp;
-    }
-
-    public void setTimestamp(Long timestamp) {
-        this.timestamp = timestamp;
+    public void setEntries(List<DLedgerEntry> entries) {
+        this.entries = entries;
     }
 }

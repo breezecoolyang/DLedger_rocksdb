@@ -18,6 +18,7 @@
 package io.openmessaging.storage.dledger.store.rocksdb.db;
 
 import com.google.common.base.Charsets;
+import io.openmessaging.storage.dledger.store.rocksdb.config.ConfigManager;
 import io.openmessaging.storage.dledger.store.rocksdb.utils.FileIOUtils;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
@@ -26,51 +27,69 @@ import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.WriteBatch;
 import org.rocksdb.RocksIterator;
 import org.rocksdb.ColumnFamilyDescriptor;
-import org.rocksdb.AbstractImmutableNativeReference;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
 
-import static io.openmessaging.storage.dledger.store.rocksdb.db.CFManager.CF_DESCRIPTOR;
-import static io.openmessaging.storage.dledger.store.rocksdb.db.CFManager.CF_HANDLES;
-import static io.openmessaging.storage.dledger.store.rocksdb.db.CFManager.initCFManger;
 
 public class RDB {
     private static Logger logger = LoggerFactory.getLogger(RDB.class);
 
-    static RocksDB db;
+    private RocksDB db;
 
-    public static void init(final String dbPath) {
+    private String dbPath;
+
+    private OptionsConfig optionsConfig;
+
+    private CFManager cfManager;
+
+    private ColumnFamilyHandle cfHandle;
+
+    private ConfigManager configManager;
+
+    public RDB(ConfigManager configManager) {
+        optionsConfig = new OptionsConfig();
+        this.configManager = configManager;
+        optionsConfig.initialOptions(this.configManager);
+        cfManager = new CFManager(optionsConfig);
+
+    }
+
+    public void init() {
         try {
+            final String dbPath = configManager.getConfig().getDbConfig().getDbPath();
             final long start = System.currentTimeMillis();
             boolean result = FileIOUtils.createOrExistsDir(new File(dbPath));
             assert result;
 
-
-            db = RocksDB.open(OptionsConfig.DB_OPTIONS, dbPath, CF_DESCRIPTOR, CF_HANDLES);
+            db = RocksDB.open(optionsConfig.getDBOptions(), dbPath, cfManager.getCfDescriptor(), cfManager.getCfHandles());
             assert db != null;
 
-            initCFManger(CF_HANDLES);
+            cfManager.initCFManger();
+
+            cfHandle = cfManager.getDefaultColumnFamilyHandle();
 
             final long cost = System.currentTimeMillis() - start;
+            this.dbPath = dbPath;
             logger.info("succ open rocksdb, path:{}, cost:{}ms", dbPath, cost);
         } catch (RocksDBException e) {
             logger.error("error while open rocksdb, path:{}, err:{}", dbPath, e.getMessage(), e);
         }
     }
 
-    public static boolean writeSync(final WriteBatch writeBatch) {
-        return write(OptionsConfig.WRITE_OPTIONS_SYNC, writeBatch);
+    public boolean writeSync(final WriteBatch writeBatch) {
+        return write(optionsConfig.getSyncWriteOptions(), writeBatch);
     }
 
-    public static boolean writeAsync(final WriteBatch writeBatch) {
-        return write(OptionsConfig.WRITE_OPTIONS_ASYNC, writeBatch);
+    public boolean writeAsync(final WriteBatch writeBatch) {
+        return write(optionsConfig.getAsyncWriteOptions(), writeBatch);
     }
 
-    private static boolean write(final WriteOptions writeOptions, final WriteBatch writeBatch) {
+    private boolean write(final WriteOptions writeOptions, final WriteBatch writeBatch) {
         try {
+            logger.error("write dbpath is [{}], db object is [{}]", dbPath, db);
             db.write(writeOptions, writeBatch);
             logger.debug("succ write writeBatch, size:{}", writeBatch.count());
         } catch (RocksDBException e) {
@@ -80,12 +99,16 @@ public class RDB {
         return true;
     }
 
-    public static RocksIterator newIterator(final ColumnFamilyHandle cfHandle) {
-        return db.newIterator(cfHandle, OptionsConfig.READ_OPTIONS);
+    public RocksIterator newIterator(final ColumnFamilyHandle cfHandle) {
+        return db.newIterator(cfHandle, optionsConfig.getReadOptions());
     }
 
-    public static boolean deleteFilesInRange(final ColumnFamilyHandle cfh, final byte[] beginKey,
-                                             final byte[] endKey) {
+    public RocksIterator newIteratorDefault() {
+        return newIterator(cfHandle);
+    }
+
+    public boolean deleteFilesInRange(final ColumnFamilyHandle cfh, final byte[] beginKey,
+                                      final byte[] endKey) {
         try {
             db.deleteRange(cfh, beginKey, endKey);
             logger.debug("succ delete range, columnFamilyHandle:{}, beginKey:{}, endKey:{}",
@@ -98,7 +121,7 @@ public class RDB {
         return true;
     }
 
-    public static boolean delete(final ColumnFamilyHandle cfh, final byte[] key) {
+    public boolean delete(final ColumnFamilyHandle cfh, final byte[] key) {
         try {
             db.delete(cfh, key);
             logger.debug("succ delete key, columnFamilyHandle:{}, key:{}", cfh.toString(), new String(key));
@@ -109,8 +132,13 @@ public class RDB {
         return true;
     }
 
-    public static byte[] get(final ColumnFamilyHandle cfh, final byte[] key) {
+    public boolean deleteDefault(final byte[] key) {
+        return delete(cfHandle, key);
+    }
+
+    public byte[] get(final ColumnFamilyHandle cfh, final byte[] key) {
         try {
+            logger.error("get dbpath is [{}], db object is [{}]", dbPath, db);
             return db.get(cfh, key);
         } catch (RocksDBException e) {
             logger.error("error while get, columnFamilyHandle:{}, key:{}, err:{}",
@@ -119,7 +147,11 @@ public class RDB {
         }
     }
 
-    public static boolean put(final ColumnFamilyHandle cfh, final byte[] key, final byte[] value) {
+    public byte[] getDefault(final byte[] key) {
+        return get(cfHandle, key);
+    }
+
+    public boolean put(final ColumnFamilyHandle cfh, final byte[] key, final byte[] value) {
         try {
             db.put(cfh, key, value);
         } catch (RocksDBException e) {
@@ -130,7 +162,7 @@ public class RDB {
         return true;
     }
 
-    public static boolean put(final ColumnFamilyHandle cfh, WriteOptions writeOptions, final byte[] key, final byte[] value) {
+    public boolean put(final ColumnFamilyHandle cfh, WriteOptions writeOptions, final byte[] key, final byte[] value) {
         try {
             db.put(cfh, writeOptions, key, value);
         } catch (RocksDBException e) {
@@ -141,11 +173,12 @@ public class RDB {
         return true;
     }
 
-    public static boolean putSync(final ColumnFamilyHandle cfh, final byte[] key, final byte[] value) {
-        return put(cfh, OptionsConfig.WRITE_OPTIONS_SYNC, key, value);
+
+    public boolean putSync(final ColumnFamilyHandle cfh, final byte[] key, final byte[] value) {
+        return put(cfh, optionsConfig.getSyncWriteOptions(), key, value);
     }
 
-    public static ColumnFamilyHandle createCF(final String name) {
+    public ColumnFamilyHandle createCF(final String name) {
         try {
             ColumnFamilyHandle cfh = db.createColumnFamily(new ColumnFamilyDescriptor(name.getBytes(Charsets.UTF_8)));
             return cfh;
@@ -155,7 +188,7 @@ public class RDB {
         }
     }
 
-    public static boolean dropCF(final ColumnFamilyHandle cfh) {
+    public boolean dropCF(final ColumnFamilyHandle cfh) {
         try {
             db.dropColumnFamily(cfh);
             return true;
@@ -165,13 +198,14 @@ public class RDB {
         }
     }
 
-    public static void close() {
-        OptionsConfig.DB_OPTIONS.close();
-        OptionsConfig.WRITE_OPTIONS_SYNC.close();
-        OptionsConfig.WRITE_OPTIONS_ASYNC.close();
-        OptionsConfig.READ_OPTIONS.close();
-        OptionsConfig.COLUMN_FAMILY_OPTIONS_DEFAULT.close();
-        CF_HANDLES.forEach(AbstractImmutableNativeReference::close);
+    public ColumnFamilyHandle getDefaultCfHandle() {
+        return cfHandle;
+    }
+
+    public void close() {
+        optionsConfig.close();
+        cfManager.closeHandles();
+
         if (db != null) {
             db.close();
         }

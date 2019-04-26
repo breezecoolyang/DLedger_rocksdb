@@ -40,6 +40,8 @@ public class ServerTestHarness extends ServerTestBase {
         String storeType) {
         DLedgerConfig config = new DLedgerConfig();
         config.group(group).selfId(selfId).peers(peers);
+        String dir = "dledger-" + config.getSelfId();
+        System.setProperty("log.middle.dir", dir);
         config.setStoreBaseDir(FileTestUtil.TEST_BASE + File.separator + group);
         config.setStoreType(storeType);
         config.setMappedFileSizeForEntryData(10 * 1024 * 1024);

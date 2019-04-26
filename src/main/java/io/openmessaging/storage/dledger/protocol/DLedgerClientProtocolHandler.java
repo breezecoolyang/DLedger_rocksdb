@@ -28,6 +28,8 @@ public interface DLedgerClientProtocolHandler {
 
     CompletableFuture<GetEntriesResponse> handleGet(GetEntriesRequest request) throws Exception;
 
+    CompletableFuture<GetListEntriesResponse> handleGetByTime(GetListEntriesRequest request) throws Exception;
+
     CompletableFuture<MetadataResponse> handleMetadata(MetadataRequest request) throws Exception;
 
 }
