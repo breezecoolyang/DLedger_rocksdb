@@ -28,8 +28,10 @@ public class BossCommand {
     public static void main(String args[]) {
         Map<String, BaseCommand> commands = new HashMap<>();
         commands.put("append", new AppendCommand());
+        commands.put("appendTps", new AppendTPSCommand());
         commands.put("get", new GetCommand());
         commands.put("readFile", new ReadFileCommand());
+
 
         JCommander.Builder builder = JCommander.newBuilder();
         builder.addCommand("server", new DLedgerConfig());
