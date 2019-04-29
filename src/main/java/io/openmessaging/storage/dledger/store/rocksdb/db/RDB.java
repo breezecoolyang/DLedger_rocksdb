@@ -27,6 +27,7 @@ import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.WriteBatch;
 import org.rocksdb.RocksIterator;
 import org.rocksdb.ColumnFamilyDescriptor;
+import org.rocksdb.FlushOptions;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -89,7 +90,7 @@ public class RDB {
 
     private boolean write(final WriteOptions writeOptions, final WriteBatch writeBatch) {
         try {
-            logger.error("write dbpath is [{}], db object is [{}]", dbPath, db);
+//            logger.error("write dbpath is [{}], db object is [{}]", dbPath, db);
             db.write(writeOptions, writeBatch);
             logger.debug("succ write writeBatch, size:{}", writeBatch.count());
         } catch (RocksDBException e) {
@@ -138,7 +139,7 @@ public class RDB {
 
     public byte[] get(final ColumnFamilyHandle cfh, final byte[] key) {
         try {
-            logger.error("get dbpath is [{}], db object is [{}]", dbPath, db);
+//            logger.error("get dbpath is [{}], db object is [{}]", dbPath, db);
             return db.get(cfh, key);
         } catch (RocksDBException e) {
             logger.error("error while get, columnFamilyHandle:{}, key:{}, err:{}",
@@ -196,6 +197,17 @@ public class RDB {
             logger.error("error while dropCF, msg:{}", e.getMessage(), e);
             return false;
         }
+    }
+
+    public void flush() {
+        try (
+                final FlushOptions flushOptions = new FlushOptions()
+                        .setWaitForFlush(true)) {
+            db.flush(flushOptions);
+        } catch (Exception e) {
+            logger.error("error while flush to storage", e);
+        }
+
     }
 
     public ColumnFamilyHandle getDefaultCfHandle() {

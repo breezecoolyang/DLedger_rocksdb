@@ -54,7 +54,7 @@ public class DLedgerRocksdbStore extends DLedgerStore {
     public static final String COMMITTED_INDEX_KEY = "committedIndex";
     public static final int MAGIC_1 = 1;
     public static final int CURRENT_MAGIC = MAGIC_1;
-    public  RDB rdb;
+    public RDB rdb;
     public static final int INDEX_UNIT_SIZE = 28; //magic + index + key_prefix(timestamp + index)
     private static final String KEY_SEPARATOR = "_";
 
@@ -114,8 +114,10 @@ public class DLedgerRocksdbStore extends DLedgerStore {
     }
 
     public void shutdown() {
+        flush();
+        logger.info("maxWrotePos is [{}], flush is [{}]", this.indexFileList.getMaxWrotePosition(), this.indexFileList.getFlushedWhere());
         rdb.close();
-        this.indexFileList.flush(0);
+//        this.indexFileList.shutdown(300);
         persistCheckPoint();
         cleanSpaceService.shutdown();
         flushDataService.shutdown();
@@ -151,11 +153,13 @@ public class DLedgerRocksdbStore extends DLedgerStore {
                 long indexFromIndex = byteBuffer.getLong();
                 long indexTimestamp = byteBuffer.getLong();
                 long indexEntryTerm = byteBuffer.getLong();
-                PreConditions.check(CURRENT_MAGIC == magic, DLedgerResponseCode.DISK_ERROR, "magic %d != %d", magic, CURRENT_MAGIC);
-                PreConditions.check(indexFromIndex == lastEntryIndex + 1, DLedgerResponseCode.DISK_ERROR, "indexFromIndex %d != %d", indexFromIndex, lastEntryIndex);
-                PreConditions.check(indexTimestamp >= lastTimestamp, DLedgerResponseCode.DISK_ERROR, "indexTimestamp %d != %d", indexFromIndex, lastTimestamp);
-                PreConditions.check(indexEntryTerm >= lastEntryTerm, DLedgerResponseCode.DISK_ERROR, "indexEntryTerm %d != %d", indexFromIndex, lastEntryTerm);
-                PreConditions.check(indexProcessOffset == indexFromIndex * INDEX_UNIT_SIZE, DLedgerResponseCode.DISK_ERROR, "pos %d != %d", indexProcessOffset, indexFromIndex * INDEX_UNIT_SIZE);
+                PreConditions.check(CURRENT_MAGIC == magic, DLedgerResponseCode.DISK_ERROR, "relativePos=%d, magic %d != %d", relativePos, magic, CURRENT_MAGIC);
+                if (lastEntryIndex != -1) {
+                    PreConditions.check(indexFromIndex == lastEntryIndex + 1, DLedgerResponseCode.DISK_ERROR, "relativePos=%d, indexFromIndex %d != %d", relativePos, indexFromIndex, lastEntryIndex);
+                }
+                PreConditions.check(indexTimestamp >= lastTimestamp, DLedgerResponseCode.DISK_ERROR, "relativePos=%d, indexTimestamp %d != %d", relativePos, indexFromIndex, lastTimestamp);
+                PreConditions.check(indexEntryTerm >= lastEntryTerm, DLedgerResponseCode.DISK_ERROR, "relativePos=%d, indexEntryTerm %d != %d", relativePos, indexFromIndex, lastEntryTerm);
+                PreConditions.check(indexProcessOffset == indexFromIndex * INDEX_UNIT_SIZE, DLedgerResponseCode.DISK_ERROR, "relativePos=%d, pos %d != %d", relativePos, indexProcessOffset, indexFromIndex * INDEX_UNIT_SIZE);
                 lastEntryIndex = indexFromIndex;
                 lastEntryTerm = indexEntryTerm;
                 indexProcessOffset += INDEX_UNIT_SIZE;
@@ -178,7 +182,7 @@ public class DLedgerRocksdbStore extends DLedgerStore {
             }
         }
 
-        logger.info("Recover data to the end entryIndex={} indexProcessOffset={} lastFileOffset={} cha={}",
+        logger.info("Recover data to the end entryIndex={} indexProcessOffset={} lastFileOffset={} relativeOffset={}",
                 lastEntryIndex, indexProcessOffset, lastMappedFile.getFileFromOffset(), indexProcessOffset - lastMappedFile.getFileFromOffset());
         if (lastMappedFile.getFileFromOffset() - indexProcessOffset > lastMappedFile.getFileSize()) {
             logger.error("[MONITOR]The processOffset is too small, you should check it manually before truncating the data from {}", indexProcessOffset);
@@ -212,8 +216,18 @@ public class DLedgerRocksdbStore extends DLedgerStore {
 
     }
 
+    public long getWritePos() {
+        return indexFileList.getMaxWrotePosition();
+    }
+
+    public long getFlushPos() {
+        return indexFileList.getFlushedWhere();
+    }
+
     public void flush() {
+        rdb.flush();
         this.indexFileList.flush(0);
+
     }
 
     private void reviseLedgerBeginIndex() {
@@ -248,7 +262,7 @@ public class DLedgerRocksdbStore extends DLedgerStore {
             long indexPos = indexFileList.append(indexBuffer.array(), 0, indexBuffer.remaining(), false);
             PreConditions.check(indexPos == entry.getIndex() * INDEX_UNIT_SIZE, DLedgerResponseCode.DISK_ERROR, "appendAsLeader indexPos %d != entryPos %d", indexPos, entry.getIndex() * INDEX_UNIT_SIZE);
             if (logger.isDebugEnabled()) {
-                logger.debug("[{}] Append as Leader {} {}", memberState.getSelfId(), entry.getIndex(), entry.getBody().length);
+                logger.debug("[{}] Append as Leader index:{} bodyLength:{}", memberState.getSelfId(), entry.getIndex(), entry.getBody().length);
             }
             ledgerEndIndex++;
             if (ledgerBeginIndex == -1) {
@@ -293,6 +307,7 @@ public class DLedgerRocksdbStore extends DLedgerStore {
             logger.error("[{}] get key is {}, index is {}", memberState.getSelfId(), key, index);
         }
         DLedgerEntry dLedgerEntry = new DLedgerEntry();
+        dLedgerEntry.setMagic(CURRENT_MAGIC);
         dLedgerEntry.setIndex(index);
         dLedgerEntry.setTimestamp(timestamp);
         dLedgerEntry.setBody(rdb.getDefault(key.getBytes()));
@@ -385,6 +400,7 @@ public class DLedgerRocksdbStore extends DLedgerStore {
             indexFileList.truncateOffset(truncateIndexOffset);
             if (indexFileList.getMaxWrotePosition() != truncateIndexOffset) {
                 logger.warn("[TRUNCATE] rebuild for index wrotePos: {} != truncatePos: {}", indexFileList.getMaxWrotePosition(), truncateIndexOffset);
+                //rebuildWithPos means read and write position start with this pos
                 PreConditions.check(indexFileList.rebuildWithPos(truncateIndexOffset), DLedgerResponseCode.DISK_ERROR, "rebuild index truncatePos=%d", truncateIndexOffset);
             }
             DLedgerRocksdbEntryCoder.encodeIndex(entry.getMagic(), entry.getIndex(), entry.getTimestamp(), entry.getTerm(), indexBuffer);
@@ -490,6 +506,12 @@ public class DLedgerRocksdbStore extends DLedgerStore {
         DLedgerEntry dLedgerEntry = get(newCommittedIndex);
         PreConditions.check(dLedgerEntry != null, DLedgerResponseCode.DISK_ERROR);
         this.committedIndex = newCommittedIndex;
+    }
+
+    public void deleteLastMappedFile(int size) {
+        for (int i = 0; i < size; i++) {
+            this.indexFileList.deleteLastMappedFile();
+        }
     }
 
     class FlushDataService extends ShutdownAbleThread {

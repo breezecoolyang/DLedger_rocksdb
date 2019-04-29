@@ -32,7 +32,6 @@ public class DLedgerEntry {
     private int channel; //reserved
     private int chainCrc; //like the block chain, this crc indicates any modification before this entry.
     private int bodyCrc; //the crc of the body
-    private byte[] key;
     private byte[] body;
 
     public int getSize() {
@@ -83,13 +82,6 @@ public class DLedgerEntry {
         this.timestamp = timestamp;
     }
 
-    public byte[] getKey() {
-        return key;
-    }
-
-    public void setKey(byte[] key) {
-        this.key = key;
-    }
     public byte[] getBody() {
         return body;
     }
@@ -130,7 +122,8 @@ public class DLedgerEntry {
                 || this.index != other.index
                 || this.term != other.term
                 || this.channel != other.channel
-                || this.pos != other.pos) {
+                || this.pos != other.pos
+                || this.timestamp != other.timestamp) {
             return false;
         }
         if (body == null) {
@@ -161,6 +154,7 @@ public class DLedgerEntry {
         h = prime * h + (int) term;
         h = prime * h + channel;
         h = prime * h + (int) pos;
+        h = prime * h + (int) timestamp;
         if (body != null) {
             for (int i = 0; i < body.length; i++) {
                 h = prime * h + body[i];

@@ -36,12 +36,12 @@ public class ServerTestBase {
 
     @After
     public synchronized void shutdown() {
-        for (String base : bases) {
-            try {
-                FileTestUtil.deleteFile(base);
-            } catch (Throwable ignored) {
-
-            }
-        }
+//        for (String base : bases) {
+//            try {
+//                FileTestUtil.deleteFile(base);
+//            } catch (Throwable ignored) {
+//
+//            }
+//        }
     }
 }

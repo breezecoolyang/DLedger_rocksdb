@@ -119,6 +119,9 @@ public class DLedgerConfig {
         return mappedFileSizeForRocksDBEntryIndex;
     }
 
+    public void setMappedFileSizeForRocksDBEntryIndex(int mappedFileSizeForRocksDBEntryIndex) {
+        this.mappedFileSizeForRocksDBEntryIndex = mappedFileSizeForRocksDBEntryIndex;
+    }
 
     public void setMappedFileSizeForEntryIndex(int mappedFileSizeForEntryIndex) {
         this.mappedFileSizeForEntryIndex = mappedFileSizeForEntryIndex;
