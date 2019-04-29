@@ -21,10 +21,13 @@ import com.alibaba.fastjson.JSON;
 import com.beust.jcommander.Parameter;
 import io.openmessaging.storage.dledger.client.DLedgerClient;
 import io.openmessaging.storage.dledger.protocol.AppendEntryResponse;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class AppendTPSCommand extends BaseCommand {
+import java.util.Random;
+
+public class PressureTestCommand extends BaseCommand {
     private static Logger logger = LoggerFactory.getLogger(AppendCommand.class);
 
     @Parameter(names = {"--group", "-g"}, description = "Group of this server")
@@ -36,26 +39,32 @@ public class AppendTPSCommand extends BaseCommand {
     @Parameter(names = {"--time", "-t"}, description = "the timestamp to append")
     private long timestamp = 1536811267;
 
-    @Parameter(names = {"--data", "-d"}, description = "the data to append")
-    private String data = "tasdfasdgasdfestfordb";
-
-    @Parameter(names = {"--count", "-c"}, description = "append several times")
-    private int count = 1;
-
-
     @Override
     public void doCommand() {
         DLedgerClient dLedgerClient = new DLedgerClient(group, peers);
         dLedgerClient.startup();
-        long start = System.currentTimeMillis();
-        for (int i = 0; i < count; i++) {
-            AppendEntryResponse response = dLedgerClient.append(timestamp, data.getBytes());
-            if (response.getIndex() < 0) {
-                logger.info("Append Error, Result:{}", JSON.toJSONString(response));
+
+        while (true) {
+            long currentTimeMillis = System.currentTimeMillis();
+            timestamp = currentTimeMillis / 1000;
+            Random random = new Random();
+            int randValue = random.nextInt(50);
+            for (int i = 0; i < randValue; i++) {
+                AppendEntryResponse response = dLedgerClient.append(timestamp, getRandomStr().getBytes());
+                if (response.getIndex() < 0) {
+                    logger.info("Append Error, Result:{}", JSON.toJSONString(response));
+                }
+                try {
+                    Thread.sleep(random.nextInt(100));
+                } catch (Exception e) {
+                    //ignore this exception
+                    logger.info("sleep Error", e);
+                }
             }
         }
-        long end = System.currentTimeMillis();
-        logger.info("time cost:{}, test count is {}", end - start, count);
-        dLedgerClient.shutdown();
+    }
+
+    public String getRandomStr() {
+        return RandomStringUtils.randomAlphanumeric(50);
     }
 }

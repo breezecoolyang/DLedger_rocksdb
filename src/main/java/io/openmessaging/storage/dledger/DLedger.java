@@ -29,7 +29,9 @@ public class DLedger {
     public static void initialLogger(DLedgerConfig dLedgerConfig) {
         String dir = "dledger-" + dLedgerConfig.getSelfId();
         System.setProperty("log.middle.dir", dir);
+        String path = System.getProperty("log.middle.dir");
         logger = LoggerFactory.getLogger(DLedger.class);
+        logger.info("logger middle path is {}", path);
 
     }
 

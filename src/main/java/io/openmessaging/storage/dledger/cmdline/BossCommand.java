@@ -20,15 +20,24 @@ package io.openmessaging.storage.dledger.cmdline;
 import com.beust.jcommander.JCommander;
 import io.openmessaging.storage.dledger.DLedger;
 import io.openmessaging.storage.dledger.DLedgerConfig;
+
 import java.util.HashMap;
 import java.util.Map;
 
 public class BossCommand {
 
+    public static void initialLogger() {
+        System.setProperty("log.middle.dir", "client");
+        String path = System.getProperty("log.middle.dir");
+
+    }
+
     public static void main(String args[]) {
+        initialLogger();
         Map<String, BaseCommand> commands = new HashMap<>();
         commands.put("append", new AppendCommand());
         commands.put("appendTps", new AppendTPSCommand());
+        commands.put("pTest", new PressureTestCommand());
         commands.put("get", new GetCommand());
         commands.put("readFile", new ReadFileCommand());
 
