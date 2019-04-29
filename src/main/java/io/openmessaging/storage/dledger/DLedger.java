@@ -24,22 +24,13 @@ import org.slf4j.LoggerFactory;
 
 public class DLedger {
 
-    private static Logger logger ;
+    private static Logger logger = LoggerFactory.getLogger(DLedger.class);
 
-    public static void initialLogger(DLedgerConfig dLedgerConfig) {
-        String dir = "dledger-" + dLedgerConfig.getSelfId();
-        System.setProperty("log.middle.dir", dir);
-        String path = System.getProperty("log.middle.dir");
-        logger = LoggerFactory.getLogger(DLedger.class);
-        logger.info("logger middle path is {}", path);
-
-    }
 
 
     public static void main(String args[]) {
         DLedgerConfig dLedgerConfig = new DLedgerConfig();
         JCommander.newBuilder().addObject(dLedgerConfig).build().parse(args);
-        initialLogger(dLedgerConfig);
         DLedgerServer dLedgerServer = new DLedgerServer(dLedgerConfig);
         dLedgerServer.startup();
         logger.info("[{}] group {} start ok with config {}", dLedgerConfig.getSelfId(), dLedgerConfig.getGroup(), JSON.toJSONString(dLedgerConfig));

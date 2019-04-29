@@ -31,8 +31,16 @@ public class BossCommand {
         if (!Arrays.asList(args).contains("server")) {
             System.setProperty("log.middle.dir", "client");
             String path = System.getProperty("log.middle.dir");
+        } else {
+            for (String str : args) {
+                if (str.startsWith("n") && str.length() == 2) {
+                    String dir = "dledger-" + str;
+                    System.setProperty("log.middle.dir", dir);
+                    String path = System.getProperty("log.middle.dir");
+                    break;
+                }
+            }
         }
-
     }
 
     public static void main(String args[]) {
