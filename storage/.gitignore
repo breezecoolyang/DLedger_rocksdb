@@ -3,6 +3,7 @@
 .project
 .settings/
 target/
+localbin/
 devenv
 *.log*
 *.iml
@@ -11,5 +12,4 @@ devenv
 !NOTICE-BIN
 !LICENSE-BIN
 .DS_Store
-localbin
 nohup.out
