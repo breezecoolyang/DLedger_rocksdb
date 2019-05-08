@@ -236,6 +236,8 @@ public class DLedgerRocksdbStore extends DLedgerStore {
         SelectMmapBufferResult sbr = firstFile.selectMappedBuffer(0);
         try {
             ByteBuffer tmpBuffer = sbr.getByteBuffer();
+            // some times the start position is not the position where the data is valid
+            // so we should posited at start position
             tmpBuffer.position(firstFile.getStartPosition());
             tmpBuffer.getInt(); //magic
             ledgerBeginIndex = tmpBuffer.getLong();

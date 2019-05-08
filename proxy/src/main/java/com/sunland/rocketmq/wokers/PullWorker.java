@@ -1,5 +1,6 @@
 package com.sunland.rocketmq.wokers;
 
+import com.sunland.rocketmq.config.ConfigManager;
 import com.sunland.rocketmq.services.MqPullService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,7 +14,7 @@ public class PullWorker {
 
     private static final List<MqPullService> PULL_SERVICES = new ArrayList<>();
 
-    private static int threadNum = 4;
+    private static int threadNum = ConfigManager.getConfig().getPullThreadNum();
     private static volatile PullWorker instance = null;
 
     private PullWorker() {
@@ -22,7 +23,6 @@ public class PullWorker {
     public void start() {
         LOGGER.info("PullWorker will start ...");
         final long start = System.currentTimeMillis();
-
 
         for (int i = 0; i < threadNum; i++) {
             MqPullService mqPullService = new MqPullService(i);

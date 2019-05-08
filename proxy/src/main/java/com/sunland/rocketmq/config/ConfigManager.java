@@ -13,6 +13,7 @@ public class ConfigManager {
         try {
             final long start = System.currentTimeMillis();
             //cfg = ConfigUtils.newConfig(configPath, ChronosConfig.class);
+            cfg = new ScheduleConfig();
             final long cost = System.currentTimeMillis() - start;
             LOGGER.info("succ init chronos config, cost:{}ms, config:{}, configFilePath:{}", cost, cfg, configPath);
         } catch (Exception e) {
@@ -22,6 +23,10 @@ public class ConfigManager {
 
     public static ScheduleConfig getConfig() {
         return cfg;
+    }
+
+    public static void setConfig(ScheduleConfig config) {
+        cfg = config;
     }
 
 

@@ -1,6 +1,7 @@
 package com.sunland.rocketmq.db;
 
 import com.google.common.base.Charsets;
+import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.sunland.rocketmq.client.DLedgerClient;
 import com.sunland.rocketmq.config.ConfigManager;
@@ -9,6 +10,8 @@ import com.sunland.rocketmq.protocol.GetListEntriesResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.util.Collection;
+import java.util.Iterator;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 public class DbOperation {
@@ -39,15 +42,26 @@ public class DbOperation {
 
     public void append(Multimap<Long, String> map) {
 
-        for (long key : map.keys()) {
+        Multimap<Long, String> deleteMap = ArrayListMultimap.create();
+        for (long key : map.keySet()) {
             Collection<String> values = map.get(key);
             for (String strValue : values) {
                 boolean result = append(key, strValue.getBytes(Charsets.UTF_8));
-                if (!result) {
+                if (result) {
+                    deleteMap.put(key, strValue);
+                }
+                else {
                     log.error("send msg error,key:{},value:{}", key, strValue);
                 }
             }
-            map.removeAll(key);
+        }
+
+        Iterator<Map.Entry<Long, String>> iterator = map.entries().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<Long, String> entry = iterator.next();
+            if (entry != null) {
+                map.remove(entry.getKey(), entry.getValue());
+            }
         }
     }
 

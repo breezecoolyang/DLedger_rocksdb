@@ -1,5 +1,6 @@
 package com.sunland.rocketmq;
 
+import com.sunland.rocketmq.config.ConfigManager;
 import com.sunland.rocketmq.wokers.PullWorker;
 import com.sunland.rocketmq.wokers.PushWorker;
 import org.apache.commons.lang3.StringUtils;
@@ -13,7 +14,7 @@ public class ScheduleStartup {
     private static final Logger LOGGER = LoggerFactory.getLogger(ScheduleStartup.class);
 
     private CountDownLatch waitForShutdown;
-    private String configFilePath = "chronos.yaml";
+    private String configFilePath = "";
     private PullWorker pullWorker;
     private PushWorker pushWorker;
 
@@ -22,23 +23,29 @@ public class ScheduleStartup {
         if (StringUtils.isNotBlank(configFilePath)) {
             this.configFilePath = configFilePath;
         }
+
+    }
+
+    public void init() {
+        /* init config */
+        ConfigManager.initConfig(configFilePath);
     }
 
     public void start() throws Exception {
-        LOGGER.info("start to launch chronos...");
+        LOGGER.info("start to launch ScheduleStartup...");
         final long start = System.currentTimeMillis();
 
         Runtime.getRuntime().addShutdownHook(new Thread() {
             @Override
             public void run() {
                 try {
-                    LOGGER.info("start to stop chronos...");
+                    LOGGER.info("start to stop ScheduleStartup...");
                     final long start = System.currentTimeMillis();
                     ScheduleStartup.this.stop();
                     final long cost = System.currentTimeMillis() - start;
-                    LOGGER.info("succ stop chronos, cost:{}ms", cost);
+                    LOGGER.info("success stop ScheduleStartup, cost:{}ms", cost);
                 } catch (Exception e) {
-                    LOGGER.error("error while shutdown chronos, err:{}", e.getMessage(), e);
+                    LOGGER.error("error while shutdown ScheduleStartup, err:{}", e.getMessage(), e);
                 } finally {
 
                 }
@@ -56,7 +63,7 @@ public class ScheduleStartup {
         pushWorker.start();
 
         final long cost = System.currentTimeMillis() - start;
-        LOGGER.info("success start chronos, cost:{}ms", cost);
+        LOGGER.info("success start ScheduleStartup, cost:{}ms", cost);
 
         waitForShutdown.await();
 
