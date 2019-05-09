@@ -21,6 +21,7 @@ public class DbOperation {
 
     public DbOperation() {
         client = new DLedgerClient(ConfigManager.getConfig().getGroup(), ConfigManager.getConfig().getPeers());
+        client.startup();
     }
 
     public boolean append(long timestamp, byte[] body) {
@@ -56,7 +57,7 @@ public class DbOperation {
             }
         }
 
-        Iterator<Map.Entry<Long, String>> iterator = map.entries().iterator();
+        Iterator<Map.Entry<Long, String>> iterator = deleteMap.entries().iterator();
         while (iterator.hasNext()) {
             Map.Entry<Long, String> entry = iterator.next();
             if (entry != null) {
@@ -67,5 +68,9 @@ public class DbOperation {
 
     public GetListEntriesResponse getByTime(long timestamp) {
         return client.getByTime(timestamp);
+    }
+
+    public void shutdown() {
+        client.shutdown();
     }
 }

@@ -1,10 +1,10 @@
 package com.sunland.rocketmq.services;
 
-import com.google.common.base.Joiner;
 import com.sunland.rocketmq.db.Batcher;
 import com.sunland.rocketmq.model.InternalKey;
 import com.sunland.rocketmq.model.InternalValue;
 import com.sunland.rocketmq.utils.JsonUtils;
+import com.sunland.rocketmq.utils.MsgUtils;
 import org.apache.rocketmq.client.consumer.DefaultMQPushConsumer;
 import org.apache.rocketmq.client.consumer.listener.ConsumeConcurrentlyContext;
 import org.apache.rocketmq.client.consumer.listener.ConsumeConcurrentlyStatus;
@@ -21,7 +21,7 @@ import java.util.concurrent.BlockingQueue;
 
 public class MqPullService implements Runnable {
 
-    private static final String CONSUMER_GROUP = "SCHEDULE_GROUP";
+    private static final String CONSUMER_GROUP = "schedule_consumer_group";
     private static final String SCHEDULE_TOPIC = "SCHEDULE_TOPIC_XXXX";
     private DefaultMQPushConsumer consumer;
     private String mqPullServiceName;
@@ -34,8 +34,8 @@ public class MqPullService implements Runnable {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(MqPullService.class);
 
-    public MqPullService(final int index) {
-        this.mqPullServiceName = Joiner.on("-").join("mqPullServiceName", index);
+    public MqPullService() {
+        this.mqPullServiceName = "mqPullServiceName";
         consumer = new DefaultMQPushConsumer(CONSUMER_GROUP);
         initConsumer();
     }
@@ -48,17 +48,32 @@ public class MqPullService implements Runnable {
 
                 @Override
                 public ConsumeConcurrentlyStatus consumeMessage(List<MessageExt> msgs, ConsumeConcurrentlyContext context) {
-                    for (MessageExt msgExt : msgs) {
-                        InternalKey key = new InternalKey(msgExt.getBornTimestamp() + msgExt.getDelayTime());
-                        InternalValue value = new InternalValue(msgExt);
-                        if (BATCHER.checkAndPut(key, JsonUtils.toJsonString(value))) {
-                            continue;
-                        }
-                        putToBlockingQueue(value);
-                    }
 
-                    if (blockingQueue.size() != 0 && blockingQueue.size() % internalQueueCount == 0) {
-                        MqPushService.getInstance().sendConcurrent(blockingQueue, MqPullService.this.mqPullServiceName);
+                    try {
+                        MqPullService.LOGGER.info("get message in consumeMessage , msg size is {}", msgs.size());
+                        for (MessageExt msgExt : msgs) {
+
+                            InternalKey key = new InternalKey(MqPullService.computeDeliverTimestamp(msgExt));
+                            MsgUtils.clearExtralProperties(msgExt);
+                            InternalValue value = new InternalValue(msgExt);
+                            MqPullService.LOGGER.info("ready to put message in consumeMessage, key is {}, value is {}", key, value);
+                            if (BATCHER.checkAndPut(key, JsonUtils.toJsonString(value))) {
+                                continue;
+                            }
+                            // delay time is up, should send the msg directly
+                            putToBlockingQueue(value);
+                            if (blockingQueue.size() != 0 && blockingQueue.size() % internalQueueCount == 0) {
+                                MqPushService.getInstance().sendConcurrent(blockingQueue, MqPullService.this.mqPullServiceName);
+                            }
+                        }
+
+                        BATCHER.flush();
+
+                        if (blockingQueue.size() != 0) {
+                            MqPushService.getInstance().sendConcurrent(blockingQueue, MqPullService.this.mqPullServiceName);
+                        }
+                    } catch (Exception e) {
+                        MqPullService.LOGGER.info("in consume message", e);
                     }
 
                     return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
@@ -71,6 +86,10 @@ public class MqPullService implements Runnable {
     }
 
 
+    private static long computeDeliverTimestamp(MessageExt msgExt) {
+        return msgExt.getStoreTimestamp() / 1000 + msgExt.getDelayTime();
+    }
+
     private void putToBlockingQueue(InternalValue internalValue) {
         try {
             blockingQueue.put(internalValue);
@@ -81,13 +100,11 @@ public class MqPullService implements Runnable {
 
     @Override
     public void run() {
-        while (!shouldStop) {
-            try {
-                consumer.start();
-            } catch (Exception e) {
-                LOGGER.error("exception happened", e);
-            }
-            consumer.shutdown();
+        try {
+            LOGGER.error("consumer start");
+            consumer.start();
+        } catch (Exception e) {
+            LOGGER.error("exception happened", e);
         }
     }
 
@@ -95,11 +112,13 @@ public class MqPullService implements Runnable {
         new Thread(this).start();
     }
 
+
     public void stop() {
         final long start = System.currentTimeMillis();
         LOGGER.info("schedule consumer will stop ...");
         shouldStop = true;
         consumer.shutdown();
+        Batcher.close();
         LOGGER.info("{} carrera consumer has stopped, cost:{}ms", mqPullServiceName, System.currentTimeMillis() - start);
     }
 }

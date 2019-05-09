@@ -1,15 +1,17 @@
 package com.sunland.rocketmq.config;
 
+import java.io.File;
+
 public class ScheduleConfig {
 
     private int pullThreadNum = 4;
     private String group = "default";
     private String peers = "n0-172.16.116.51:40911;n1-172.16.116.51:40912;n2-172.16.116.51:40913";
-    private String seekTimePath = "";
+    private String seekTimePath = File.separator + "tmp" + File.separator + "proxy";
     private int pullBatchNum = 1000;
 
     private int flushCheckInterval = 500;
-    private int flushSeekTimeInterval = 1000;
+    private int flushSeekTimeInterval = 100;
     private int sendMsgRepeatedNum = 10;
 
     private String nameServeAddr = "172.16.116.48:9876";

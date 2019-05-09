@@ -1,6 +1,7 @@
 package com.sunland.rocketmq;
 
 import com.sunland.rocketmq.config.ConfigManager;
+import com.sunland.rocketmq.config.SeekTimeConfig;
 import com.sunland.rocketmq.wokers.PullWorker;
 import com.sunland.rocketmq.wokers.PushWorker;
 import org.apache.commons.lang3.StringUtils;
@@ -29,6 +30,7 @@ public class ScheduleStartup {
     public void init() {
         /* init config */
         ConfigManager.initConfig(configFilePath);
+        SeekTimeConfig.loadSeekTime();
     }
 
     public void start() throws Exception {

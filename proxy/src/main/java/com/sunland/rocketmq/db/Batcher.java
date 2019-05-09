@@ -21,7 +21,7 @@ public class Batcher {
     private Multimap<Long, String> map = ArrayListMultimap.create();
     private volatile int itemNum = 0;
     private static volatile Batcher instance = null;
-    private DbOperation dbOperation = new DbOperation();
+    private static DbOperation dbOperation = new DbOperation();
     private long lastCheckStamp = TsUtils.genTS();
 
     public static volatile ReentrantLock lock = new ReentrantLock();
@@ -87,5 +87,9 @@ public class Batcher {
         } finally {
             lock.unlock();
         }
+    }
+
+    public static void close() {
+        dbOperation.shutdown();
     }
 }

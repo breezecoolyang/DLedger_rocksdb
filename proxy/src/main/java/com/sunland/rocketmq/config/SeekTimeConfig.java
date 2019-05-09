@@ -17,7 +17,7 @@ public class SeekTimeConfig {
     private static final String SEEK_TIME_FILE = "seekTime";
     private static final String SEEK_TIME = "seekTime";
     private static volatile long seekTimestamp = -1;
-    private static Properties properties = new Properties();
+    private static Properties properties;
     private static final Timer TIMER = new Timer("ScheduleMessageTimerThread", true);
 
     public static void persistSeekTime() {
@@ -46,8 +46,11 @@ public class SeekTimeConfig {
         } catch (Throwable t) {
             log.error("Load seekTime failed", t);
         }
+        if (properties == null) {
+            properties = new Properties();
+            properties.put(SEEK_TIME, Long.valueOf(seekTimestamp).toString());
+        }
 
-        properties.put(SEEK_TIME, Long.valueOf(seekTimestamp).toString());
 
         TIMER.scheduleAtFixedRate(new TimerTask() {
 

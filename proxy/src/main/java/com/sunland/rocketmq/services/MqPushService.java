@@ -1,6 +1,7 @@
 package com.sunland.rocketmq.services;
 
 import com.google.common.base.Charsets;
+import com.sunland.rocketmq.config.ConfigManager;
 import com.sunland.rocketmq.config.SeekTimeConfig;
 import com.sunland.rocketmq.db.DbOperation;
 import com.sunland.rocketmq.entry.DLedgerEntry;
@@ -77,6 +78,7 @@ public class MqPushService {
     private void initProducer() {
         final long start = System.currentTimeMillis();
         producer = new DefaultMQProducer(PRODUCER_GROUP);
+        producer.setNamesrvAddr(ConfigManager.getConfig().getNameServeAddr());
 
         try {
             producer.start();
@@ -108,10 +110,12 @@ public class MqPushService {
                 seekTimestamp, start / 1000, diff, round);
 
         int count = 0;
-        GetListEntriesResponse listEntriesResponse = dbOperation.getByTime(now);
+        GetListEntriesResponse listEntriesResponse = dbOperation.getByTime(seekTimestamp);
+        LOGGER.info("pull from db start, seekTimestamp:{} getList size {}", seekTimestamp, listEntriesResponse.getEntries().size());
         for (DLedgerEntry entry : listEntriesResponse.getEntries()) {
             final InternalValue internalValue = JsonUtils.fromJsonString(entry.getBody(), InternalValue.class);
             if (internalValue == null) {
+                LOGGER.error("error while convert form json to value [{}]", new String(entry.getBody()));
                 continue;
             }
 
@@ -132,7 +136,7 @@ public class MqPushService {
 
         SeekTimeConfig.updateSeekTime();
 
-        LOGGER.info("pull from db finish push, pushCost:{}ms, count:{}, seekTimestamp:{}, round:{}",
+        LOGGER.debug("pull from db finish push, pushCost:{}ms, count:{}, seekTimestamp:{}, round:{}",
                 System.currentTimeMillis() - start, count, seekTimestamp, round);
     }
 
@@ -143,7 +147,7 @@ public class MqPushService {
         }
 
         final long sendCount = blockingQueue.size();
-        LOGGER.info("pull from db sendConcurrent start, send count:{}, round:{}", sendCount, round);
+        LOGGER.debug("pull from db sendConcurrent start, send count:{}, round:{}", sendCount, round);
         final long start = System.currentTimeMillis();
         final CountDownLatch cdl = new CountDownLatch(blockingQueue.size());
         InternalValue internalValue;
@@ -170,7 +174,7 @@ public class MqPushService {
             e.printStackTrace();
         }
         final long cost = System.currentTimeMillis() - start;
-        LOGGER.info("pull from db sendConcurrent end, send count:{}, round:{}, cost:{}ms", sendCount, round, cost);
+        LOGGER.debug("pull from db sendConcurrent end, send count:{}, round:{}, cost:{}ms", sendCount, round, cost);
     }
 
     public void sendConcurrent(final BlockingQueue<InternalValue> blockingQueue, final String from) {
@@ -211,18 +215,17 @@ public class MqPushService {
     }
 
     private boolean send(final String topic, final byte[] body, final String tags, final Map<String, String> properties) {
-        Message msg = new Message(topic,
-                tags,
-                body);
-        if (!msg.getProperties().equals(properties)) {
-            MessageAccessor.setProperties(msg, properties);
-        }
+        Message msg = new Message();
+        MessageAccessor.setProperties(msg, properties);
+        msg.setTags(tags);
+        msg.setBody(body);
+        msg.setTopic(properties.get(MessageConst.PROPERTY_REAL_TOPIC));
         // delete delay properties
-        MessageAccessor.clearProperty(msg, MessageConst.PROPERTY_DELAY_TIME_LEVEL);
-        MessageAccessor.clearProperty(msg, MessageConst.PROPERTY_DELAY_TIME);
+        MessageAccessor.clearProperty(msg, MessageConst.PROPERTY_REAL_TOPIC);
 
         SendResult sendResult = null;
         try {
+            LOGGER.info("read to send msg is [{}]", msg);
             sendResult = producer.send(msg);
         } catch (Exception e) {
             LOGGER.error("send msg error, msg is {}", msg, e);
@@ -268,6 +271,8 @@ public class MqPushService {
             producer.shutdown();
             LOGGER.info("success shutdown producer");
         }
+
+        dbOperation.shutdown();
     }
 
     public static MqPushService getInstance() {
