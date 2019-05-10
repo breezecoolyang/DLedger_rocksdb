@@ -3,6 +3,7 @@ package com.sunland.rocketmq.services;
 import com.google.common.base.Charsets;
 import com.sunland.rocketmq.config.ConfigManager;
 import com.sunland.rocketmq.config.SeekTimeConfig;
+import com.sunland.rocketmq.db.Batcher;
 import com.sunland.rocketmq.db.DbOperation;
 import com.sunland.rocketmq.entry.DLedgerEntry;
 import com.sunland.rocketmq.model.InternalValue;
@@ -37,6 +38,7 @@ public class MqPushService {
     private static final BlockingQueue<InternalValue> BLOCKING_QUEUE = new ArrayBlockingQueue<>(INTERNAL_PAIR_COUNT);
     private static volatile MqPushService instance = null;
     private DefaultMQProducer producer = null;
+    private final Batcher batcher = Batcher.getInstance();
     private long round = 0;
     private DbOperation dbOperation;
 
@@ -111,7 +113,6 @@ public class MqPushService {
 
         int count = 0;
         GetListEntriesResponse listEntriesResponse = dbOperation.getByTime(seekTimestamp);
-        LOGGER.info("pull from db start, seekTimestamp:{} getList size {}", seekTimestamp, listEntriesResponse.getEntries().size());
         for (DLedgerEntry entry : listEntriesResponse.getEntries()) {
             final InternalValue internalValue = JsonUtils.fromJsonString(entry.getBody(), InternalValue.class);
             if (internalValue == null) {
@@ -133,6 +134,10 @@ public class MqPushService {
         }
 
         sendConcurrent(BLOCKING_QUEUE, round);
+
+        // make sure that the message in buffer have been written to server
+        // otherwise we may miss some msg in buffer if we iterate next time
+        batcher.flush();
 
         SeekTimeConfig.updateSeekTime();
 

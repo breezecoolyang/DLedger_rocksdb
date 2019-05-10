@@ -41,7 +41,6 @@ public class SeekTimeConfig {
             if (prop != null) {
                 properties = prop;
                 seekTimestamp = Long.valueOf(String.valueOf(properties.get(SEEK_TIME)).trim());
-                return;
             }
         } catch (Throwable t) {
             log.error("Load seekTime failed", t);
@@ -62,14 +61,26 @@ public class SeekTimeConfig {
                     log.error("scheduleAtFixedRate flush exception", e);
                 }
             }
-        }, 10000, ConfigManager.getConfig().getFlushSeekTimeInterval());
+        }, 3000, ConfigManager.getConfig().getFlushSeekTimeInterval());
+
+        log.error("seek time init success");
     }
 
     public static long getSeekTime() {
         return seekTimestamp;
     }
 
+    public static void setSeekTime(long seekTime) { seekTimestamp = seekTime;}
+
     public static void updateSeekTime() {
+        /*the lock is to make sure we only update time stamp  after the msg have been written to storage device
+         * consider a situation as follows
+         *            pull                               push
+         *                                           timestamp ---> 5
+         *        msg timestamp 6 (can write (6>5))
+         *                                           7 (if the timestamp update to 7 when we write msg, the msg with timestamp 6 will be missed)
+         *
+         */
         Batcher.lock.lock();
         try {
             seekTimestamp++;

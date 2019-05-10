@@ -49,8 +49,9 @@ public class Batcher {
         try {
             if (itemNum > 0) {
                 dbOperation.append(map);
+                itemNum = 0;
             }
-            itemNum = map.size();
+
         } finally
         {
             lock.unlock();

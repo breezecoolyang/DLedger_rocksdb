@@ -43,6 +43,7 @@ public class MqPullService implements Runnable {
     private void initConsumer() {
         try {
             consumer.subscribe(SCHEDULE_TOPIC, "*");
+            consumer.setConsumeMessageBatchMaxSize(ConfigManager.getConfig().getConsumeMessageBatchMaxSize());
             consumer.setNamesrvAddr(ConfigManager.getConfig().getNameServeAddr());
             consumer.registerMessageListener(new MessageListenerConcurrently() {
 
@@ -73,7 +74,7 @@ public class MqPullService implements Runnable {
                             MqPushService.getInstance().sendConcurrent(blockingQueue, MqPullService.this.mqPullServiceName);
                         }
                     } catch (Exception e) {
-                        MqPullService.LOGGER.info("in consume message", e);
+                        MqPullService.LOGGER.error("exception in consume message", e);
                     }
 
                     return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
@@ -81,7 +82,7 @@ public class MqPullService implements Runnable {
             });
             LOGGER.info("{} init  consumer, consumerGroup:{}", mqPullServiceName, CONSUMER_GROUP);
         } catch (Exception e) {
-            LOGGER.info(" init  consumer exception", e);
+            LOGGER.error(" init  consumer exception", e);
         }
     }
 
@@ -101,7 +102,6 @@ public class MqPullService implements Runnable {
     @Override
     public void run() {
         try {
-            LOGGER.error("consumer start");
             consumer.start();
         } catch (Exception e) {
             LOGGER.error("exception happened", e);
@@ -115,10 +115,10 @@ public class MqPullService implements Runnable {
 
     public void stop() {
         final long start = System.currentTimeMillis();
-        LOGGER.info("schedule consumer will stop ...");
+        LOGGER.warn("schedule consumer will stop ...");
         shouldStop = true;
         consumer.shutdown();
         Batcher.close();
-        LOGGER.info("{} carrera consumer has stopped, cost:{}ms", mqPullServiceName, System.currentTimeMillis() - start);
+        LOGGER.warn("{}  consumer has stopped, cost:{}ms", mqPullServiceName, System.currentTimeMillis() - start);
     }
 }

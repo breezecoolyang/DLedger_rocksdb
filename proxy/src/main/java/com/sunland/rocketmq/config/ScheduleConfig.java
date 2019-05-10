@@ -13,6 +13,7 @@ public class ScheduleConfig {
     private int flushCheckInterval = 500;
     private int flushSeekTimeInterval = 100;
     private int sendMsgRepeatedNum = 10;
+    private int consumeMessageBatchMaxSize = 32;
 
     private String nameServeAddr = "172.16.116.48:9876";
 
@@ -87,5 +88,15 @@ public class ScheduleConfig {
     public void setNameServeAddr(String nameServeAddr) {
         this.nameServeAddr = nameServeAddr;
     }
+
+
+    public int getConsumeMessageBatchMaxSize() {
+        return consumeMessageBatchMaxSize;
+    }
+
+    public void setConsumeMessageBatchMaxSize(int consumeMessageBatchMaxSize) {
+        this.consumeMessageBatchMaxSize = consumeMessageBatchMaxSize;
+    }
+
 
 }
